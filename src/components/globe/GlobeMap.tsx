@@ -251,10 +251,10 @@ export default function GlobeMap({
       map.addLayer({
         id: 'listing-dots', type: 'circle', source: 'listings',
         paint: {
-          'circle-radius':       ['interpolate', ['linear'], ['zoom'], 2, 0, 3.5, 1, 5, 2.5, 8, 4],
+          'circle-radius':       ['interpolate', ['linear'], ['zoom'], 2, 0, 3.5, 1.5, 5, 3.75, 8, 6],
           'circle-color':        '#30d158',
           'circle-stroke-width': 2,
-          'circle-stroke-color': '#30d158',
+          'circle-stroke-color': '#ffffff',
           'circle-opacity':      ['interpolate', ['linear'], ['zoom'], 2, 0, 3.5, 0.6, 5, 1],
           'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], 2, 0, 3.5, 0.6, 5, 1],
         },
