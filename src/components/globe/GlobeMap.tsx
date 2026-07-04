@@ -269,9 +269,9 @@ export default function GlobeMap({
           'text-anchor': 'bottom',
         },
         paint: {
-          'text-color':      '#30d158',
-          'text-halo-color': '#000',
-          'text-halo-width': 1.5,
+          'text-color':      '#0a7d3c',
+          'text-halo-color': '#ffffff',
+          'text-halo-width': 3,
           'text-opacity':    ['interpolate', ['linear'], ['zoom'], 3.5, 0, 5, 1],
         },
       })
