@@ -244,7 +244,39 @@ export default function GlobeMap({
       map.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
       map.addLayer({ id: 'route-line', type: 'line', source: 'route', paint: { 'line-color': '#ffb800', 'line-width': 1.5, 'line-opacity': 0.8, 'line-dasharray': [5, 3] } })
 
-      // Airports
+      // Listing offer dots — added before the airport layers so airport dots
+      // always render on top of them, and sized/faded by zoom so they only
+      // become visible once the user has zoomed in on the globe.
+      map.addSource('listings', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+      map.addLayer({
+        id: 'listing-dots', type: 'circle', source: 'listings',
+        paint: {
+          'circle-radius':       ['interpolate', ['linear'], ['zoom'], 2, 0, 3.5, 1, 5, 2.5, 8, 4],
+          'circle-color':        '#30d158',
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#30d158',
+          'circle-opacity':      ['interpolate', ['linear'], ['zoom'], 2, 0, 3.5, 0.6, 5, 1],
+          'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], 2, 0, 3.5, 0.6, 5, 1],
+        },
+      })
+      map.addLayer({
+        id: 'listing-labels', type: 'symbol', source: 'listings',
+        layout: {
+          'text-field':  ['get', 'label'],
+          'text-font':   ['DIN Pro Medium', 'Arial Unicode MS Regular'],
+          'text-size':   10,
+          'text-offset': [0, -1.8],
+          'text-anchor': 'bottom',
+        },
+        paint: {
+          'text-color':      '#30d158',
+          'text-halo-color': '#000',
+          'text-halo-width': 1.5,
+          'text-opacity':    ['interpolate', ['linear'], ['zoom'], 3.5, 0, 5, 1],
+        },
+      })
+
+      // Airports — added after listing dots so they always draw on top.
       map.addSource('airports', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
       map.addLayer({
         id: 'airports-dots', type: 'circle', source: 'airports',
@@ -270,34 +302,6 @@ export default function GlobeMap({
           'text-color':       ['case', ['==', ['get', 'type'], 'home'], '#00cfff', '#39ff8f'],
           'text-halo-color':  '#000',
           'text-halo-width':  1.5,
-        },
-      })
-
-      // Listing offer dots
-      map.addSource('listings', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
-      map.addLayer({
-        id: 'listing-dots', type: 'circle', source: 'listings',
-        paint: {
-          'circle-radius':       8,
-          'circle-color':        '#30d158',
-          'circle-stroke-width': 2,
-          'circle-stroke-color': '#30d158',
-          'circle-opacity':      1,
-        },
-      })
-      map.addLayer({
-        id: 'listing-labels', type: 'symbol', source: 'listings',
-        layout: {
-          'text-field':  ['get', 'label'],
-          'text-font':   ['DIN Pro Medium', 'Arial Unicode MS Regular'],
-          'text-size':   10,
-          'text-offset': [0, -1.8],
-          'text-anchor': 'bottom',
-        },
-        paint: {
-          'text-color':      '#30d158',
-          'text-halo-color': '#000',
-          'text-halo-width': 1.5,
         },
       })
 
