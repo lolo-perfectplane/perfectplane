@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import type { Params } from '@/components/AppShell'
 import type { APEntry } from '@/lib/airports'
+import { useSwipeToClose } from './useSwipeToClose'
 
 type Props = {
   open: boolean
@@ -78,6 +79,7 @@ export default function MobileFiltersDrawer({ open, onClose, params, onChange, o
   const [rtB, setRtB]           = useState('')
   const [routeRes, setRouteRes] = useState<{ nm: number; km: number } | null>(null)
   const [routeErr, setRouteErr] = useState('')
+  const { dragY, handlers } = useSwipeToClose(onClose)
 
   const fmtM   = (v: number) => v >= 1000 ? `$${(v/1000).toFixed(1)}M` : `$${v}K`
   const fmtYr  = (v: number) => v >= 1000 ? `$${(v/1000).toFixed(1)}M/yr` : v >= 1 ? `$${v}K/yr` : `$${Math.round(v*1000)}/yr`
@@ -141,19 +143,21 @@ export default function MobileFiltersDrawer({ open, onClose, params, onChange, o
         backdropFilter: 'blur(50px) saturate(180%)',
         borderRadius: '20px 20px 0 0',
         display: 'flex', flexDirection: 'column',
-        transform: open ? 'translateY(0)' : 'translateY(100%)',
-        transition: 'transform 0.3s ease-out',
+        transform: open ? `translateY(${dragY}px)` : 'translateY(100%)',
+        transition: dragY > 0 ? 'none' : 'transform 0.3s ease-out',
         boxShadow: '0 -4px 40px rgba(0,0,0,0.2)',
       }}>
-        {/* Drag handle */}
-        <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'center', paddingTop: 12, paddingBottom: 4 }}>
-          <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.15)' }} />
-        </div>
+        {/* Drag handle + title — swipe down here to close */}
+        <div {...handlers}>
+          <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'center', paddingTop: 12, paddingBottom: 4 }}>
+            <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.15)' }} />
+          </div>
 
-        {/* Title */}
-        <div style={{ flexShrink: 0, padding: '8px 20px 14px', borderBottom: '0.5px solid rgba(0,0,0,0.07)' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.03em' }}>Mission</div>
-          <div style={{ fontSize: 13, color: '#86868b', marginTop: 2 }}>Tune your requirements</div>
+          {/* Title */}
+          <div style={{ flexShrink: 0, padding: '8px 20px 14px', borderBottom: '0.5px solid rgba(0,0,0,0.07)' }}>
+            <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.03em' }}>Mission</div>
+            <div style={{ fontSize: 13, color: '#86868b', marginTop: 2 }}>Tune your requirements</div>
+          </div>
         </div>
 
         {/* Scrollable content */}
@@ -169,12 +173,12 @@ export default function MobileFiltersDrawer({ open, onClose, params, onChange, o
                 <input value={rtA} placeholder="From" maxLength={6}
                   onChange={e => setRtA(e.target.value.toUpperCase())}
                   onKeyDown={e => e.key === 'Enter' && handleRoute()}
-                  style={{ width: '42%', flexShrink: 0, height: 44, padding: '0 8px', borderRadius: 12, border: '0.5px solid rgba(0,0,0,0.12)', background: 'rgba(118,118,128,0.08)', fontFamily: 'inherit', fontSize: 13, outline: 'none', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em', boxSizing: 'border-box' }}
+                  style={{ width: '42%', flexShrink: 0, height: 44, padding: '0 8px', borderRadius: 12, border: '0.5px solid rgba(0,0,0,0.12)', background: 'rgba(118,118,128,0.08)', fontFamily: 'inherit', fontSize: 16, outline: 'none', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em', boxSizing: 'border-box' }}
                 />
                 <input value={rtB} placeholder="To" maxLength={6}
                   onChange={e => setRtB(e.target.value.toUpperCase())}
                   onKeyDown={e => e.key === 'Enter' && handleRoute()}
-                  style={{ width: '42%', flexShrink: 0, height: 44, padding: '0 8px', borderRadius: 12, border: '0.5px solid rgba(0,0,0,0.12)', background: 'rgba(118,118,128,0.08)', fontFamily: 'inherit', fontSize: 13, outline: 'none', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em', boxSizing: 'border-box' }}
+                  style={{ width: '42%', flexShrink: 0, height: 44, padding: '0 8px', borderRadius: 12, border: '0.5px solid rgba(0,0,0,0.12)', background: 'rgba(118,118,128,0.08)', fontFamily: 'inherit', fontSize: 16, outline: 'none', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em', boxSizing: 'border-box' }}
                 />
                 <button onClick={handleRoute} style={{ width: 44, height: 44, borderRadius: 12, border: 'none', background: '#0a84ff', color: '#fff', cursor: 'pointer', fontSize: 18, flexShrink: 0 }}>→</button>
               </div>

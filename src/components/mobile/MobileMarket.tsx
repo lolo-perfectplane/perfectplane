@@ -242,12 +242,12 @@ function FilterSheet({ onClose, activeFilterCount, clearAll, filtered,
             <div style={{ fontSize: 11, fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Year</div>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
               <select value={yearFrom} onChange={e => setYearFrom(Math.min(Number(e.target.value), yearTo))}
-                style={{ flex: 1, height: 38, borderRadius: 10, border: '0.5px solid rgba(0,0,0,0.12)', background: 'rgba(118,118,128,0.07)', fontFamily: 'inherit', fontSize: 14, color: '#1d1d1f', paddingLeft: 10 }}>
+                style={{ flex: 1, height: 38, borderRadius: 10, border: '0.5px solid rgba(0,0,0,0.12)', background: 'rgba(118,118,128,0.07)', fontFamily: 'inherit', fontSize: 16, color: '#1d1d1f', paddingLeft: 10 }}>
                 {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
               </select>
               <span style={{ fontSize: 12, color: '#86868b' }}>to</span>
               <select value={yearTo} onChange={e => setYearTo(Math.max(Number(e.target.value), yearFrom))}
-                style={{ flex: 1, height: 38, borderRadius: 10, border: '0.5px solid rgba(0,0,0,0.12)', background: 'rgba(118,118,128,0.07)', fontFamily: 'inherit', fontSize: 14, color: '#1d1d1f', paddingLeft: 10 }}>
+                style={{ flex: 1, height: 38, borderRadius: 10, border: '0.5px solid rgba(0,0,0,0.12)', background: 'rgba(118,118,128,0.07)', fontFamily: 'inherit', fontSize: 16, color: '#1d1d1f', paddingLeft: 10 }}>
                 {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
               </select>
             </div>
@@ -520,7 +520,7 @@ export default function MobileMarket({ listings: initialListings, onContact, onS
             value={search}
             placeholder="Search aircraft, model…"
             onChange={e => { setSearch(e.target.value); setBrand(null) }}
-            style={{ width: '100%', boxSizing: 'border-box', height: 40, padding: '0 14px 0 36px', borderRadius: 12, border: 'none', background: 'rgba(118,118,128,0.12)', fontFamily: 'inherit', fontSize: 14, outline: 'none' }}
+            style={{ width: '100%', boxSizing: 'border-box', height: 40, padding: '0 14px 0 36px', borderRadius: 12, border: 'none', background: 'rgba(118,118,128,0.12)', fontFamily: 'inherit', fontSize: 16, outline: 'none' }}
           />
         </div>
 

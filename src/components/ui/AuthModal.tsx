@@ -36,7 +36,7 @@ export default function AuthModal({ onClose, onLogin }: Props) {
   const inp: React.CSSProperties = {
     width: '100%', height: 40, background: 'rgba(118,118,128,0.08)',
     border: 'none', borderRadius: 10, fontFamily: 'inherit',
-    fontSize: 14, fontWeight: 500, padding: '0 12px',
+    fontSize: 16, fontWeight: 500, padding: '0 12px',
     color: '#1d1d1f', marginBottom: 10, outline: 'none',
   }
 

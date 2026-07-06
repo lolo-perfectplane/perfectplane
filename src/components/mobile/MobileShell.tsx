@@ -144,7 +144,7 @@ export default function MobileShell(props: MobileShellProps) {
         padding: '0 20px',
         overflow: 'hidden',
       }}>
-        <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.03em', color: '#1d1d1f' }}>Perfect<span style={{ color: '#0a84ff' }}>Plane</span></span>
+        <span style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.03em', color: '#1d1d1f' }}>Perfect<span style={{ color: '#0a84ff' }}>Plane</span></span>
         {user ? (
           <button onClick={() => setActiveTab('profile')}
             style={{ width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'rgba(10,132,255,0.12)', color: '#0a84ff', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -152,7 +152,7 @@ export default function MobileShell(props: MobileShellProps) {
           </button>
         ) : (
           <button onClick={() => openModal('auth')}
-            style={{ height: 32, padding: '0 14px', borderRadius: 100, border: 'none', background: '#0a84ff', color: '#fff', fontSize: 14, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}>
+            style={{ height: 32, padding: '0 14px', borderRadius: 100, border: 'none', background: '#0a84ff', color: '#fff', fontSize: 16, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}>
             Sign In
           </button>
         )}
@@ -192,12 +192,12 @@ export default function MobileShell(props: MobileShellProps) {
                   if (v.length >= 3) onHomeAP(v)
                 }}
                 style={{
-                  width: 180, height: 34, padding: '0 14px',
+                  width: 180, height: 38, padding: '0 14px',
                   borderRadius: 17, border: 'none',
                   background: homeAp ? 'rgba(10,132,255,0.18)' : 'rgba(255,255,255,0.22)',
                   backdropFilter: 'blur(12px)',
                   color: homeAp ? '#0a84ff' : 'rgba(255,255,255,0.85)',
-                  fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                  fontSize: 16, fontWeight: 600, fontFamily: 'inherit',
                   textTransform: 'uppercase', letterSpacing: '0.06em',
                   outline: 'none',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
@@ -219,7 +219,7 @@ export default function MobileShell(props: MobileShellProps) {
               background: showWind ? 'rgba(52,199,89,0.22)' : 'rgba(255,255,255,0.22)',
               backdropFilter: 'blur(16px) saturate(180%)',
               color: showWind ? '#34c759' : '#ffffff',
-              fontSize: 12, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
+              fontSize: 16, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: 6,
               boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
             }}
@@ -262,7 +262,7 @@ export default function MobileShell(props: MobileShellProps) {
               height: 48, padding: '0 24px',
               borderRadius: 24, border: 'none',
               background: homeAp ? '#0a84ff' : 'rgba(10,132,255,0.35)',
-              color: '#fff', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+              color: '#fff', fontSize: 14, fontWeight: 600, fontFamily: 'inherit',
               cursor: homeAp ? 'pointer' : 'not-allowed',
               display: 'flex', alignItems: 'center', gap: 7,
               boxShadow: homeAp ? '0 4px 16px rgba(10,132,255,0.5)' : 'none',

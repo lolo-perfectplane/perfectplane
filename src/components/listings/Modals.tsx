@@ -27,7 +27,7 @@ const card: React.CSSProperties = {
 const inp: React.CSSProperties = {
   width: '100%', height: 40,
   background: 'rgba(118,118,128,0.08)', border: 'none',
-  borderRadius: 10, fontFamily: 'inherit', fontSize: 14,
+  borderRadius: 10, fontFamily: 'inherit', fontSize: 16,
   fontWeight: 500, padding: '0 12px', color: '#1d1d1f', boxSizing: 'border-box',
 }
 const lbl: React.CSSProperties = {
@@ -632,7 +632,7 @@ export function AdminModal({ userId, onClose, onApproved }: AdminProps) {
 
   const editInp: React.CSSProperties = {
     width: '100%', height: 34, background: 'rgba(118,118,128,0.08)', border: 'none',
-    borderRadius: 8, fontFamily: 'inherit', fontSize: 13, padding: '0 10px', color: '#1d1d1f', boxSizing: 'border-box',
+    borderRadius: 8, fontFamily: 'inherit', fontSize: 16, padding: '0 10px', color: '#1d1d1f', boxSizing: 'border-box',
   }
   const editLbl: React.CSSProperties = {
     fontSize: 10, fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 3, display: 'block',
@@ -1053,7 +1053,7 @@ export function MyItemsModal({ userId, onClose, onChanged }: MyItemsProps) {
   })
   const editInp: React.CSSProperties = {
     width: '100%', height: 34, background: 'rgba(118,118,128,0.08)', border: 'none',
-    borderRadius: 8, fontFamily: 'inherit', fontSize: 13, padding: '0 10px', color: '#1d1d1f', boxSizing: 'border-box',
+    borderRadius: 8, fontFamily: 'inherit', fontSize: 16, padding: '0 10px', color: '#1d1d1f', boxSizing: 'border-box',
   }
   const editLbl: React.CSSProperties = {
     fontSize: 10, fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 3, display: 'block',

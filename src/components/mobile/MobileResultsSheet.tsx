@@ -2,6 +2,7 @@
 // src/components/mobile/MobileResultsSheet.tsx
 import { useState } from 'react'
 import { AC } from '@/lib/aircraft'
+import { useSwipeToClose } from './useSwipeToClose'
 
 type Sort = 'match' | 'price_asc' | 'price_desc' | 'range_asc' | 'range_desc' | 'hr_asc' | 'hr_desc' | 'speed_asc' | 'speed_desc'
 
@@ -18,6 +19,7 @@ type Props = {
 export default function MobileResultsSheet({ open, onClose, results, selAC, onSelect, onOffers, windBR }: Props) {
   const [search, setSearch] = useState('')
   const [sort, setSort]     = useState<Sort>('match')
+  const { dragY, handlers } = useSwipeToClose(onClose)
 
   const filtered = results
     .filter(a => a.name.toLowerCase().includes(search.toLowerCase()))
@@ -60,27 +62,29 @@ export default function MobileResultsSheet({ open, onClose, results, selAC, onSe
         backdropFilter: 'blur(50px) saturate(180%)',
         borderRadius: '20px 20px 0 0',
         display: 'flex', flexDirection: 'column',
-        transform: open ? 'translateY(0)' : 'translateY(100%)',
-        transition: 'transform 0.3s ease-out',
+        transform: open ? `translateY(${dragY}px)` : 'translateY(100%)',
+        transition: dragY > 0 ? 'none' : 'transform 0.3s ease-out',
         boxShadow: '0 -4px 40px rgba(0,0,0,0.2)',
       }}>
-        {/* Drag handle */}
-        <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'center', paddingTop: 12, paddingBottom: 4 }}>
-          <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.15)' }} />
-        </div>
+        {/* Drag handle + header — swipe down here to close */}
+        <div {...handlers}>
+          <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'center', paddingTop: 12, paddingBottom: 4 }}>
+            <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.15)' }} />
+          </div>
 
-        {/* Header */}
-        <div style={{ flexShrink: 0, padding: '8px 20px 10px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <div>
-              <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.03em' }}>Matches</div>
-              <div style={{ fontSize: 13, color: '#86868b', marginTop: 1 }}>
-                {results.length === 0
-                  ? 'No results yet'
-                  : <><b style={{ color: '#0a84ff' }}>{results.length}</b> aircraft found</>}
+          {/* Header */}
+          <div style={{ flexShrink: 0, padding: '8px 20px 10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.03em' }}>Matches</div>
+                <div style={{ fontSize: 13, color: '#86868b', marginTop: 1 }}>
+                  {results.length === 0
+                    ? 'No results yet'
+                    : <><b style={{ color: '#0a84ff' }}>{results.length}</b> aircraft found</>}
+                </div>
               </div>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, color: '#86868b', cursor: 'pointer', padding: '0 4px' }}>✕</button>
             </div>
-            <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, color: '#86868b', cursor: 'pointer', padding: '0 4px' }}>✕</button>
           </div>
         </div>
 
@@ -90,11 +94,11 @@ export default function MobileResultsSheet({ open, onClose, results, selAC, onSe
             <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#86868b', fontSize: 14, pointerEvents: 'none' }}>⌕</span>
             <input value={search} placeholder="Search model"
               onChange={e => setSearch(e.target.value)}
-              style={{ width: '100%', boxSizing: 'border-box', height: 38, padding: '0 12px 0 32px', borderRadius: 10, border: '0.5px solid rgba(0,0,0,0.1)', background: 'rgba(118,118,128,0.1)', fontFamily: 'inherit', fontSize: 14, outline: 'none' }}
+              style={{ width: '100%', boxSizing: 'border-box', height: 38, padding: '0 12px 0 32px', borderRadius: 10, border: '0.5px solid rgba(0,0,0,0.1)', background: 'rgba(118,118,128,0.1)', fontFamily: 'inherit', fontSize: 16, outline: 'none' }}
             />
           </div>
           <select value={sort} onChange={e => setSort(e.target.value as Sort)}
-            style={{ height: 38, padding: '0 8px', borderRadius: 10, border: '0.5px solid rgba(0,0,0,0.12)', background: 'rgba(118,118,128,0.1)', fontFamily: 'inherit', fontSize: 12, color: '#1d1d1f', cursor: 'pointer', flexShrink: 0 }}>
+            style={{ height: 38, padding: '0 8px', borderRadius: 10, border: '0.5px solid rgba(0,0,0,0.12)', background: 'rgba(118,118,128,0.1)', fontFamily: 'inherit', fontSize: 16, color: '#1d1d1f', cursor: 'pointer', flexShrink: 0 }}>
             <option value="match">Best match</option>
             <option value="price_asc">Price ↑</option>
             <option value="price_desc">Price ↓</option>

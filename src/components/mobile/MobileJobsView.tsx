@@ -61,7 +61,7 @@ function ApplySheet({ job, user, onClose }: { job: Job; user: User | null; onClo
     finally { setLoading(false) }
   }
 
-  const inp: React.CSSProperties = { width: '100%', boxSizing: 'border-box', height: 44, padding: '0 14px', borderRadius: 12, border: '0.5px solid rgba(0,0,0,0.1)', background: 'rgba(118,118,128,0.07)', fontFamily: 'inherit', fontSize: 15, outline: 'none', color: '#1d1d1f' }
+  const inp: React.CSSProperties = { width: '100%', boxSizing: 'border-box', height: 44, padding: '0 14px', borderRadius: 12, border: '0.5px solid rgba(0,0,0,0.1)', background: 'rgba(118,118,128,0.07)', fontFamily: 'inherit', fontSize: 16, outline: 'none', color: '#1d1d1f' }
 
   return (
     <>
@@ -103,7 +103,7 @@ function ProfileSheet({ open, onClose, profile, setProfile, matchMode, setMatchM
   matchMode: boolean; setMatchMode: (v: boolean) => void
   matchCount: number
 }) {
-  const inp: React.CSSProperties = { width: '100%', boxSizing: 'border-box', height: 42, padding: '0 12px', borderRadius: 11, border: 'none', background: 'rgba(118,118,128,0.1)', fontFamily: 'inherit', fontSize: 15, color: '#1d1d1f', outline: 'none' }
+  const inp: React.CSSProperties = { width: '100%', boxSizing: 'border-box', height: 42, padding: '0 12px', borderRadius: 11, border: 'none', background: 'rgba(118,118,128,0.1)', fontFamily: 'inherit', fontSize: 16, color: '#1d1d1f', outline: 'none' }
 
   return (
     <>
@@ -341,7 +341,7 @@ export default function MobileJobsView({ user, onAuthClick, TAB_H, HDR_H }: {
           <div style={{ position: 'relative' }}>
             <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#86868b', fontSize: 15, pointerEvents: 'none' }}>⌕</span>
             <input value={search} placeholder="Search title, company…" onChange={e => setSearch(e.target.value)}
-              style={{ width: '100%', boxSizing: 'border-box', height: 40, padding: '0 14px 0 34px', borderRadius: 12, border: 'none', background: 'rgba(118,118,128,0.12)', fontFamily: 'inherit', fontSize: 14, outline: 'none' }} />
+              style={{ width: '100%', boxSizing: 'border-box', height: 40, padding: '0 14px 0 34px', borderRadius: 12, border: 'none', background: 'rgba(118,118,128,0.12)', fontFamily: 'inherit', fontSize: 16, outline: 'none' }} />
           </div>
         </div>
 
