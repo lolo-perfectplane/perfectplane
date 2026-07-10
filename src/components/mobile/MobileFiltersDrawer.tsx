@@ -17,6 +17,14 @@ type Props = {
   homeAp: { icao: string; name?: string } | null
   selAC?: { name: string; type: string; range: number; tas: number } | null
   onRouteWaypoints?: (wps: { lat: number; lon: number; icao: string }[] | null) => void
+  windLevel?: string
+  windLoaded?: boolean
+}
+
+const WIND_STATUS_LABEL: Record<string, string> = {
+  FL350: '✓ FL350 jet stream loaded',
+  FL180: '✓ FL180 upper winds loaded',
+  FL100: '✓ FL100 cruise winds loaded',
 }
 
 function SliderRow({ label, min, max, value, step, fmt, onChange, mode, onModeChange, log }: {
@@ -74,7 +82,7 @@ function SliderRow({ label, min, max, value, step, fmt, onChange, mode, onModeCh
   )
 }
 
-export default function MobileFiltersDrawer({ open, onClose, params, onChange, onHomeAP, onRoutCalc, onFind, homeAp, selAC, onRouteWaypoints }: Props) {
+export default function MobileFiltersDrawer({ open, onClose, params, onChange, onHomeAP, onRoutCalc, onFind, homeAp, selAC, onRouteWaypoints, windLevel = 'FL350', windLoaded }: Props) {
   const [apVal, setApVal]       = useState('')
   const [apName, setApName]     = useState('')
   const [rtA, setRtA]           = useState('')
@@ -200,6 +208,12 @@ export default function MobileFiltersDrawer({ open, onClose, params, onChange, o
 
           {/* Locked wrapper */}
           <div style={{ opacity: homeAp ? 1 : 0.35, pointerEvents: homeAp ? 'auto' : 'none', transition: 'opacity 0.2s' }}>
+
+            {windLoaded && (
+              <div key={windLevel} style={{ marginBottom: 14, fontSize: 13, color: '#34c759', fontWeight: 500, animation: 'fadeIn 0.3s ease' }}>
+                {WIND_STATUS_LABEL[windLevel] ?? `✓ ${windLevel} winds loaded`}
+              </div>
+            )}
 
             {/* Route */}
             <div style={section}>

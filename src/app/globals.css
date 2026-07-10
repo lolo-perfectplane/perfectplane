@@ -6,6 +6,11 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* Listing tooltip popup on the globe — strip Mapbox's default popup chrome
    so only our custom card renders. */
 .mapboxgl-popup-content {

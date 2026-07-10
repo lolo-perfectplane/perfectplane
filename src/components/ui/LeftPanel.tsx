@@ -17,6 +17,14 @@ type Props = {
   selAC?: { name: string; type: string; range: number; tas: number } | null
   onStopsChange?: (s: 0 | 1 | 2 | 3) => void
   onRouteWaypoints?: (wps: { lat: number; lon: number; icao: string }[] | null) => void
+  windLevel?: string
+  windLoaded?: boolean
+}
+
+const WIND_STATUS_LABEL: Record<string, string> = {
+  FL350: '✓ FL350 jet stream loaded',
+  FL180: '✓ FL180 upper winds loaded',
+  FL100: '✓ FL100 cruise winds loaded',
 }
 
 // Wind toggle lives in the bottom HUD bar only (see AppShell's HudBar) —
@@ -106,7 +114,7 @@ function TypeSeg({ jet, turbo, piston, onChange }: {
   )
 }
 
-export default function LeftPanel({ params, onChange, onHomeAP, onRoutCalc, onFind, homeAp, selAC, onStopsChange, onRouteWaypoints }: Props) {
+export default function LeftPanel({ params, onChange, onHomeAP, onRoutCalc, onFind, homeAp, selAC, onStopsChange, onRouteWaypoints, windLevel = 'FL350', windLoaded }: Props) {
   const [apVal, setApVal]           = useState('')
   const [apName, setApName]         = useState('')
   const [rtA, setRtA]               = useState('')
@@ -216,6 +224,11 @@ export default function LeftPanel({ params, onChange, onHomeAP, onRoutCalc, onFi
             {apName && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, color: '#0a84ff', fontWeight: 500 }}>
                 <span>✓</span><span>{homeAp?.name ?? 'Airport set'}</span>
+              </div>
+            )}
+            {windLoaded && (
+              <div key={windLevel} style={{ marginTop: 6, fontSize: 12, color: '#34c759', fontWeight: 500, animation: 'fadeIn 0.3s ease' }}>
+                {WIND_STATUS_LABEL[windLevel] ?? `✓ ${windLevel} winds loaded`}
               </div>
             )}
           </div>

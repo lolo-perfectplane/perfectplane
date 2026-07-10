@@ -58,6 +58,8 @@ export interface MobileShellProps {
   onRouteWaypoints?: (wps: { lat: number; lon: number; icao: string }[] | null) => void
   selAC: (typeof AC)[0] | null
   setSelAC: (ac: (typeof AC)[0] | null) => void
+  onSelectAC: (ac: (typeof AC)[0] | null) => void
+  windLevel: string
   results: ((typeof AC)[0] & { sc: number })[]
   marketSearch: string
   setMarketSearch: (s: string) => void
@@ -85,7 +87,8 @@ const ALL_AIRPORTS_EMPTY: { ic: string; la: number; lo: number }[] = []
 
 export default function MobileShell(props: MobileShellProps) {
   const {
-    params, setParams, homeAp, routeDest, routeWaypoints, onRouteWaypoints, selAC, setSelAC,
+    params, setParams, homeAp, routeDest, routeWaypoints, onRouteWaypoints, selAC,
+    onSelectAC, windLevel,
     results, contactListing, setContactListing,
     user, setUser, windBR, windUV, showWind,
     listings, onHomeAP, onRoutCalc, onFind, openOffers, openContact,
@@ -242,6 +245,7 @@ export default function MobileShell(props: MobileShellProps) {
           selACRange={selAC?.range ?? null}
           windBR={windBR}
           windUV={windUV}
+          windLevel={windLevel}
           reachableAirports={reachableAirports}
           allAirports={allAirports ?? ALL_AIRPORTS_EMPTY}
           showWind={showWind}
@@ -302,7 +306,7 @@ export default function MobileShell(props: MobileShellProps) {
             }}
           >
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: showWind ? '#34c759' : '#ff3b30', display: 'inline-block', transition: 'background 0.2s' }} />
-            Winds
+            <span key={windLevel} style={{ animation: 'fadeIn 0.3s ease' }}>Winds · {windLevel}</span>
           </button>
 
           {/* Results pill — above filters pill (only when results exist) */}
@@ -455,6 +459,8 @@ export default function MobileShell(props: MobileShellProps) {
         homeAp={homeAp}
         selAC={selAC}
         onRouteWaypoints={onRouteWaypoints}
+        windLevel={windLevel}
+        windLoaded={showWind && !!windUV}
       />
 
       <MobileResultsSheet
@@ -462,7 +468,7 @@ export default function MobileShell(props: MobileShellProps) {
         onClose={() => setResultsOpen(false)}
         results={results}
         selAC={selAC}
-        onSelect={ac => setSelAC(ac === selAC ? null : ac)}
+        onSelect={onSelectAC}
         onOffers={ac => { openOffers(ac); setResultsOpen(false); setActiveTab('market') }}
         windBR={windBR}
       />

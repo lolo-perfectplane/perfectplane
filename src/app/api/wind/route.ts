@@ -4,12 +4,13 @@ import { createServerClient } from '@/lib/supabase-server'
 
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000
 
-// FL350 only — this is the one pressure level (250hPa) Open-Meteo
-// reliably returns jet-stream-relevant data for. Other levels were
-// silently failing or returning stale/zeroed data, which is why
-// wind direction looked stuck at ~270° everywhere.
-const FL = 'FL350'
-const HPA = 250
+// Three pressure levels, one per aircraft category — Open-Meteo reliably
+// returns wind data at each of these for the jet-stream / cruise bands.
+const FL_MAP: Record<string, number> = {
+  FL350: 250,  // jets         — ~34,000 ft
+  FL180: 500,  // turboprops   — ~18,000 ft
+  FL100: 700,  // pistons      — ~10,000 ft
+}
 
 // Smaller grid (20° steps instead of 10°) — keeps the request well
 // under Open-Meteo's per-call coordinate limit so it actually
@@ -21,13 +22,13 @@ for (let lo = -180; lo < 180; lo += 20) LONS.push(lo)
 
 type WindPoint = { lat: number; lon: number; u: number; v: number; spd: number }
 
-async function fetchWind(): Promise<WindPoint[]> {
+async function fetchWind(hPa: number): Promise<WindPoint[]> {
   const allLats: number[] = []
   const allLons: number[] = []
   LATS.forEach(la => LONS.forEach(lo => { allLats.push(la); allLons.push(lo) }))
 
-  const speedVar = `wind_speed_${HPA}hPa`
-  const dirVar   = `wind_direction_${HPA}hPa`
+  const speedVar = `wind_speed_${hPa}hPa`
+  const dirVar   = `wind_direction_${hPa}hPa`
 
   const url =
     `https://api.open-meteo.com/v1/forecast?` +
@@ -39,7 +40,7 @@ async function fetchWind(): Promise<WindPoint[]> {
   if (!r.ok) throw new Error(`Open-Meteo HTTP ${r.status}`)
 
   const data = await r.json()
-  if (data.error) throw new Error(data.reason || `Open-Meteo error for ${HPA}hPa`)
+  if (data.error) throw new Error(data.reason || `Open-Meteo error for ${hPa}hPa`)
 
   const pts = Array.isArray(data) ? data : [data]
   const now = Math.floor(Date.now() / 1000)
@@ -79,7 +80,11 @@ async function fetchWind(): Promise<WindPoint[]> {
 }
 
 export async function GET(req: NextRequest) {
-  const cacheKey = `wind_fl350_${HPA}hpa`
+  const { searchParams } = new URL(req.url)
+  const fl  = (searchParams.get('fl') || 'FL350').toUpperCase() as keyof typeof FL_MAP
+  const hPa = FL_MAP[fl] ?? 250
+
+  const cacheKey = `wind_${fl.toLowerCase()}_${hPa}hpa`
   const supabase = createServerClient()
 
   try {
@@ -94,13 +99,13 @@ export async function GET(req: NextRequest) {
 
     if (cached && cacheAge < CACHE_TTL_MS) {
       return NextResponse.json({
-        points: cached.value, fl: FL, hPa: HPA, cached: true,
+        points: cached.value, fl, hPa, cached: true,
         age_minutes: Math.round(cacheAge / 60000),
         next_refresh_minutes: Math.round((CACHE_TTL_MS - cacheAge) / 60000),
       })
     }
 
-    const points = await fetchWind()
+    const points = await fetchWind(hPa)
     const totalRequested = LATS.length * LONS.length
     const coverage = points.length / totalRequested
 
@@ -116,13 +121,13 @@ export async function GET(req: NextRequest) {
     })
 
     return NextResponse.json({
-      points, fl: FL, hPa: HPA, cached: false,
+      points, fl, hPa, cached: false,
       age_minutes: 0,
       coverage: Math.round(coverage * 100),
       next_refresh_minutes: Math.round(CACHE_TTL_MS / 60000),
     })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
-    return NextResponse.json({ error: msg, fl: FL, hPa: HPA }, { status: 500 })
+    return NextResponse.json({ error: msg, fl, hPa }, { status: 500 })
   }
 }

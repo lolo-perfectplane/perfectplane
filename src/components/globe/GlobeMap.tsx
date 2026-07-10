@@ -69,6 +69,7 @@ type Props = {
   selACRange:        number | null
   windBR:            number[] | null
   windUV:            WindUV
+  windLevel?:        string
   reachableAirports: Airport[]
   allAirports:       Airport[]
   showWind:          boolean
@@ -253,7 +254,7 @@ function applyDots(map: mapboxgl.Map, dots: ListingDot[]) {
 
 // ── Component ─────────────────────────────────────────────────
 export default function GlobeMap({
-  homeAp, routeDest, routeWaypoints, selACRange, windBR, windUV,
+  homeAp, routeDest, routeWaypoints, selACRange, windBR, windUV, windLevel = 'FL350',
   reachableAirports, allAirports, showWind, onMapLoad, active = true,
   listingDots = [], onSeeOffer,
 }: Props) {
@@ -311,7 +312,7 @@ export default function GlobeMap({
 
       // Route
       map.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
-      map.addLayer({ id: 'route-line', type: 'line', source: 'route', paint: { 'line-color': '#ff3b30', 'line-width': 1.5, 'line-opacity': 0.8, 'line-dasharray': [5, 3] } })
+      map.addLayer({ id: 'route-line', type: 'line', source: 'route', paint: { 'line-color': '#ff3b30', 'line-width': 3, 'line-opacity': 0.8, 'line-dasharray': [5, 3] } })
 
       // Route stopovers — intermediate waypoints on a multi-leg route
       map.addSource('route-stops', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
@@ -349,9 +350,39 @@ export default function GlobeMap({
         paint: { 'text-color': '#ff3b30', 'text-halo-color': '#000', 'text-halo-width': 1.5 },
       })
 
-      // Listing offer dots — added before the airport layers so airport dots
-      // always render on top of them, and sized/faded by zoom so they only
-      // become visible once the user has zoomed in on the globe.
+      // Airports source + layers — added before listing dots so aircraft
+      // offer dots always render on top of them.
+      map.addSource('airports', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+      map.addLayer({
+        id: 'airports-dots', type: 'circle', source: 'airports',
+        paint: {
+          'circle-radius':       ['case', ['==', ['get', 'type'], 'home'], 8, ['==', ['get', 'type'], 'reachable'], 5, 3],
+          'circle-color':        ['case', ['==', ['get', 'type'], 'home'], '#00cfff', ['==', ['get', 'type'], 'reachable'], '#39ff8f', 'rgba(100,160,255,0.3)'],
+          'circle-stroke-width': ['case', ['==', ['get', 'type'], 'home'], 2, 0],
+          'circle-stroke-color': '#00cfff',
+          'circle-opacity':      ['case', ['==', ['get', 'type'], 'dot'], 0.35, 1],
+        },
+      })
+      map.addLayer({
+        id: 'airports-labels', type: 'symbol', source: 'airports',
+        filter: ['!=', ['get', 'type'], 'dot'],
+        layout: {
+          'text-field':  ['get', 'icao'],
+          'text-font':   ['DIN Pro Medium', 'Arial Unicode MS Regular'],
+          'text-size':   10,
+          'text-offset': [0, -1.5],
+          'text-anchor': 'bottom',
+        },
+        paint: {
+          'text-color':       ['case', ['==', ['get', 'type'], 'home'], '#00cfff', '#39ff8f'],
+          'text-halo-color':  '#000',
+          'text-halo-width':  1.5,
+        },
+      })
+
+      // Listing offer dots — added last so they render on top of airport dots,
+      // the home base marker, the destination marker, and leg-stop markers.
+      // Sized/faded by zoom so they only become visible once zoomed in.
       map.addSource('listings', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
       map.addLayer({
         id: 'listing-dots', type: 'circle', source: 'listings',
@@ -379,34 +410,6 @@ export default function GlobeMap({
         paint: {
           'text-color':   '#ffffff',
           'text-opacity': ['interpolate', ['linear'], ['zoom'], 2, 0, 3.5, 0.6, 5, 1],
-        },
-      })
-      // Airports — added after listing dots so they always draw on top.
-      map.addSource('airports', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
-      map.addLayer({
-        id: 'airports-dots', type: 'circle', source: 'airports',
-        paint: {
-          'circle-radius':       ['case', ['==', ['get', 'type'], 'home'], 8, ['==', ['get', 'type'], 'reachable'], 5, 3],
-          'circle-color':        ['case', ['==', ['get', 'type'], 'home'], '#00cfff', ['==', ['get', 'type'], 'reachable'], '#39ff8f', 'rgba(100,160,255,0.3)'],
-          'circle-stroke-width': ['case', ['==', ['get', 'type'], 'home'], 2, 0],
-          'circle-stroke-color': '#00cfff',
-          'circle-opacity':      ['case', ['==', ['get', 'type'], 'dot'], 0.35, 1],
-        },
-      })
-      map.addLayer({
-        id: 'airports-labels', type: 'symbol', source: 'airports',
-        filter: ['!=', ['get', 'type'], 'dot'],
-        layout: {
-          'text-field':  ['get', 'icao'],
-          'text-font':   ['DIN Pro Medium', 'Arial Unicode MS Regular'],
-          'text-size':   10,
-          'text-offset': [0, -1.5],
-          'text-anchor': 'bottom',
-        },
-        paint: {
-          'text-color':       ['case', ['==', ['get', 'type'], 'home'], '#00cfff', '#39ff8f'],
-          'text-halo-color':  '#000',
-          'text-halo-width':  1.5,
         },
       })
 
@@ -657,6 +660,13 @@ export default function GlobeMap({
       ctx.fillRect(0, 0, canvas.width, canvas.height)
       ctx.globalCompositeOperation = 'source-over'
 
+      // Level indicator — confirms which pressure level's wind data is displayed.
+      if (showWind) {
+        ctx.font = '600 11px Inter, -apple-system, sans-serif'
+        ctx.fillStyle = 'rgba(52,199,89,0.8)'
+        ctx.fillText(windLevel, canvas.width - 52, 18)
+      }
+
       const W = canvas.width, H = canvas.height
       const center = map.getCenter()
       const cLat   = center.lat * Math.PI / 180
@@ -759,7 +769,7 @@ export default function GlobeMap({
     return () => {
       if (animRef.current) { cancelAnimationFrame(animRef.current); animRef.current = null }
     }
-  }, [showWind, windUV])
+  }, [showWind, windUV, windLevel])
 
   // ── Resize canvas ──────────────────────────────────────────
   useEffect(() => {

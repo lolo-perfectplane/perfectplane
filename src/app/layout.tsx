@@ -1,5 +1,6 @@
 // src/app/layout.tsx
 import type { Metadata } from 'next'
+import { Analytics } from '@vercel/analytics/next'
 import CookieConsentLoader from '@/components/ui/CookieConsentLoader'
 import './globals.css'
 
@@ -16,6 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       {GTM_ID && <CookieConsentLoader gtmId={GTM_ID} />}
       <body style={{ overflow: 'hidden' }}>
         {children}
+        <Analytics />
       </body>
     </html>
   )

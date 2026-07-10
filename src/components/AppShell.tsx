@@ -23,14 +23,21 @@ import DesktopProfile from './ui/DesktopProfile'
 import FavoritesTab from './ui/FavoritesTab'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
-// Wind data is fixed at FL350 (250hPa) — the only pressure level
-// Open-Meteo reliably returns for the jet-stream band.
+// Wind level is auto-selected from the chosen aircraft's cruise category —
+// jets sample the FL350 jet stream, turboprops FL180, pistons FL100.
+function windLevelForType(type: 'jet' | 'turbo' | 'piston' | undefined): string {
+  if (type === 'jet') return 'FL350'
+  if (type === 'turbo') return 'FL180'
+  if (type === 'piston') return 'FL100'
+  return 'FL350'
+}
 
 // ── Interactive HUD bar ───────────────────────────────────────
-function HudBar({ homeAp, selAC, showWind, onWindToggle, onWindFetch }: {
+function HudBar({ homeAp, selAC, showWind, windLevel, onWindToggle, onWindFetch }: {
   homeAp: APEntry | null
   selAC: typeof AC[0] | null
   showWind: boolean
+  windLevel: string
   onWindToggle: (v: boolean) => void
   onWindFetch: () => void
 }) {
@@ -90,9 +97,9 @@ function HudBar({ homeAp, selAC, showWind, onWindToggle, onWindFetch }: {
           background: showWind ? 'rgba(52,199,89,0.1)' : 'transparent',
           transition: 'background 0.2s',
         }}
-        title={showWind ? 'Click to disable winds (FL350)' : 'Click to enable winds (FL350)'}
+        title={showWind ? `Click to disable winds (${windLevel})` : `Click to enable winds (${windLevel})`}
       >
-        <span style={hudL}>Winds · FL350</span>
+        <span key={windLevel} style={{ ...hudL, animation: 'fadeIn 0.3s ease' }}>Winds · {windLevel}</span>
         <span style={{ ...hudV, display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{
             width: 8, height: 8, borderRadius: '50%', display: 'inline-block',
@@ -180,6 +187,7 @@ export default function AppShell({ initialListings }: { initialListings: Listing
   type WindPoint = { lat: number; lon: number; u: number; v: number; spd: number }
   const [windUV,       setWindUV]       = useState<WindPoint[] | null>(null)
   const [showWind,     setShowWind]     = useState(false)
+  const [windLevel,    setWindLevel]    = useState<string>('FL350')
   const [listings,     setListings]     = useState<Listing[]>(initialListings)
   const [legalDoc,     setLegalDoc]     = useState<'tos' | 'privacy' | null>(null)
   const [showWelcome,  setShowWelcome]  = useState(false)
@@ -245,9 +253,10 @@ export default function AppShell({ initialListings }: { initialListings: Listing
     setShowWelcome(false)
   }
 
-  const fetchWind = async () => {
+  const fetchWind = async (fl?: string) => {
+    const level = fl ?? windLevel
     try {
-      const r = await fetch(`/api/wind`)
+      const r = await fetch(`/api/wind?fl=${level}`)
       if (!r.ok) return
       const d = await r.json()
       if (d.error) return
@@ -258,6 +267,22 @@ export default function AppShell({ initialListings }: { initialListings: Listing
       // pointing the same direction (the bug we're fixing here).
       setWindUV(pts); setWindBR(null)
     } catch {}
+  }
+
+  // Selecting an aircraft also switches the wind-sampling level to match its
+  // cruise altitude band, refetching live if winds are currently shown.
+  const handleSelectAC = (ac: typeof AC[0] | null) => {
+    const next = ac === selAC ? null : ac
+    setSelAC(next)
+    if (ac && ac !== selAC) {
+      const newLevel = windLevelForType(ac.type)
+      setWindLevel(newLevel)
+      if (showWind) {
+        setWindUV(null)
+        setWindBR(null)
+        fetchWind(newLevel)
+      }
+    }
   }
 
   // Inverse-distance-weighted sample of the real wind grid at one lat/lon —
@@ -344,7 +369,7 @@ export default function AppShell({ initialListings }: { initialListings: Listing
         params={params} setParams={setParams}
         homeAp={homeAp} routeDest={routeDest}
         routeWaypoints={routeWaypoints} onRouteWaypoints={setRouteWaypoints}
-        selAC={selAC} setSelAC={setSelAC}
+        selAC={selAC} setSelAC={setSelAC} onSelectAC={handleSelectAC} windLevel={windLevel}
         results={results}
         marketSearch={marketSearch} setMarketSearch={setMarketSearch}
         contactListing={contactListing} setContactListing={setContactListing}
@@ -357,7 +382,7 @@ export default function AppShell({ initialListings }: { initialListings: Listing
         openOffers={openOffers}
         openContact={openContact}
         onWindToggle={v => { setShowWind(v); if (!v) { setWindBR(null); setWindUV(null) } }}
-        onWindFetch={fetchWind}
+        onWindFetch={() => fetchWind(windLevel)}
         refreshListings={refreshListings}
         reachableAirports={reachable}
         allAirports={ALL_AIRPORTS}
@@ -377,6 +402,7 @@ export default function AppShell({ initialListings }: { initialListings: Listing
           selACRange={selAC?.range ?? null}
           windBR={windBR}
           windUV={windUV}
+          windLevel={windLevel}
           reachableAirports={reachable}
           allAirports={ALL_AIRPORTS}
           showWind={showWind}
@@ -422,11 +448,13 @@ export default function AppShell({ initialListings }: { initialListings: Listing
             selAC={selAC}
             onStopsChange={setStops}
             onRouteWaypoints={setRouteWaypoints}
+            windLevel={windLevel}
+            windLoaded={showWind && !!windUV}
           />
           <RightPanel
             results={results}
             selAC={selAC}
-            onSelect={ac => setSelAC(ac === selAC ? null : ac)}
+            onSelect={handleSelectAC}
             onOffers={openOffers}
             windBR={windBR}
             homeAp={homeAp}
@@ -438,8 +466,9 @@ export default function AppShell({ initialListings }: { initialListings: Listing
             homeAp={homeAp}
             selAC={selAC}
             showWind={showWind}
+            windLevel={windLevel}
             onWindToggle={v => { setShowWind(v); if (!v) { setWindBR(null); setWindUV(null) } }}
-            onWindFetch={fetchWind}
+            onWindFetch={() => fetchWind(windLevel)}
           />
         </>
       )}
