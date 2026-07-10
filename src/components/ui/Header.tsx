@@ -2,16 +2,19 @@
 // src/components/ui/Header.tsx
 
 type Props = {
-  activeTab: 'globe' | 'market' | 'jobs'
+  activeTab: 'globe' | 'market' | 'jobs' | 'profile' | 'favorites'
   onTabChange: (t: 'globe' | 'market' | 'jobs') => void
   user: { name: string; role: string } | null
   onAuthClick: () => void
+  onProfileClick: () => void
   onSellClick: () => void
   onAdminClick: () => void
-  onMyItemsClick: () => void
+  onFavoritesClick: () => void
+  onMessagesClick?: () => void
+  unreadCount?: number
 }
 
-export default function Header({ activeTab, onTabChange, user, onAuthClick, onSellClick, onAdminClick, onMyItemsClick }: Props) {
+export default function Header({ activeTab, onTabChange, user, onAuthClick, onProfileClick, onSellClick, onAdminClick, onFavoritesClick, onMessagesClick, unreadCount = 0 }: Props) {
   return (
     <header className="pp-topbar">
       {/* Brand */}
@@ -41,15 +44,26 @@ export default function Header({ activeTab, onTabChange, user, onAuthClick, onSe
           ⚙
         </button>
       )}
-      {user && (
-        <button onClick={onMyItemsClick} title="My listings & jobs" style={{ width: 32, height: 32, borderRadius: 8, border: 'none', background: 'transparent', color: '#4b5563', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          📋
+      <button onClick={onSellClick} style={{ height: 32, padding: '0 14px', borderRadius: 16, border: 'none', background: 'rgba(10,132,255,0.1)', color: '#0a84ff', fontSize: 12, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+        Free listing
+      </button>
+      <button onClick={onFavoritesClick} title="Favorites" style={{ width: 32, height: 32, borderRadius: 8, border: 'none', background: activeTab === 'favorites' ? 'rgba(255,59,48,0.1)' : 'transparent', color: activeTab === 'favorites' ? '#ff3b30' : '#4b5563', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        ♡
+      </button>
+      {user && onMessagesClick && (
+        <button onClick={onMessagesClick} title="Messages" style={{ position: 'relative', width: 32, height: 32, borderRadius: 8, border: 'none', background: 'transparent', color: '#4b5563', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          💬
+          {unreadCount > 0 && (
+            <span style={{
+              position: 'absolute', top: 2, right: 2,
+              minWidth: 14, height: 14, borderRadius: 7, background: '#ff3b30', color: '#fff',
+              fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '0 3px', lineHeight: 1,
+            }}>{unreadCount > 9 ? '9+' : unreadCount}</span>
+          )}
         </button>
       )}
-      <button onClick={onSellClick} style={{ width: 32, height: 32, borderRadius: 8, border: 'none', background: 'transparent', color: '#4b5563', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        +
-      </button>
-      <button onClick={onAuthClick} style={{ height: 32, padding: '0 16px', borderRadius: 16, border: 'none', background: '#0a84ff', color: '#fff', fontSize: 12, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', marginLeft: 2 }}>
+      <button onClick={() => (user ? onProfileClick() : onAuthClick())} style={{ height: 32, padding: '0 16px', borderRadius: 16, border: 'none', background: activeTab === 'profile' ? '#0a6ad9' : '#0a84ff', color: '#fff', fontSize: 12, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', marginLeft: 2 }}>
         {user ? user.name.split(' ')[0] : 'Sign in'}
       </button>
     </header>

@@ -16,6 +16,11 @@ import AuthModal from './ui/AuthModal'
 import { SellModal, AdminModal, ContactModal, MyItemsModal } from './listings/Modals'
 import MobileShell from './mobile/MobileShell'
 import LegalModal from './ui/LegalModal'
+import WelcomeModal from './ui/WelcomeModal'
+import MessageModal, { type MessageListing } from './ui/MessageModal'
+import MessagesPanel from './ui/MessagesPanel'
+import DesktopProfile from './ui/DesktopProfile'
+import FavoritesTab from './ui/FavoritesTab'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
 // Wind data is fixed at FL350 (250hPa) — the only pressure level
@@ -119,10 +124,16 @@ function resolveListingDots(listings: import('@/lib/supabase').Listing[]) {
     const tokens = l.location.trim().toUpperCase().split(/[\s—\-,/]+/)
     for (const tok of tokens) {
       if (tok.length >= 3 && tok.length <= 4) {
-        const ap = AIRPORT_COORDS[tok]
-        if (ap) return [{ lon: ap.lon, lat: ap.lat, model: l.model ?? '', price: l.price ?? null }]
+        // Exact match first (fast path), then fall back to lookupAirport's
+        // fuzzy matching — airports.ts is hand-edited and codes can be
+        // renamed/removed, so a strict dictionary lookup silently drops pins.
+        const ap = AIRPORT_COORDS[tok] ?? lookupAirport(tok)
+        if (ap) return [{ lon: ap.lon, lat: ap.lat, model: l.model ?? '', price: l.price ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id }]
       }
     }
+    // Last resort: try resolving the full location string (handles names/formats that don't tokenize cleanly)
+    const byName = lookupAirport(l.location)
+    if (byName) return [{ lon: byName.lon, lat: byName.lat, model: l.model ?? '', price: l.price ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id }]
     return []
   })
   console.log('[AppShell] resolveListingDots — listings:', listings.length, 'resolved:', dots.length, listings.map(l => l.location))
@@ -146,7 +157,7 @@ export type Params = {
 }
 
 type Modal = 'none' | 'auth' | 'sell' | 'admin' | 'contact' | 'myitems'
-type Tab   = 'globe' | 'market' | 'jobs'
+type Tab   = 'globe' | 'market' | 'jobs' | 'profile' | 'favorites'
 type User  = { id: string; name: string; email: string; role: string }
 
 export default function AppShell({ initialListings }: { initialListings: Listing[] }) {
@@ -171,6 +182,68 @@ export default function AppShell({ initialListings }: { initialListings: Listing
   const [showWind,     setShowWind]     = useState(false)
   const [listings,     setListings]     = useState<Listing[]>(initialListings)
   const [legalDoc,     setLegalDoc]     = useState<'tos' | 'privacy' | null>(null)
+  const [showWelcome,  setShowWelcome]  = useState(false)
+  const [stops,        setStops]        = useState<0 | 1 | 2 | 3>(0)
+  const [routeWaypoints, setRouteWaypoints] = useState<{ lat: number; lon: number; icao: string }[] | null>(null)
+  const [authMessage,  setAuthMessage]  = useState<string | undefined>(undefined)
+  const [messageListing, setMessageListing] = useState<MessageListing | null>(null)
+  const [messagesOpen, setMessagesOpen] = useState(false)
+  const [unreadCount,  setUnreadCount]  = useState(0)
+  const [openListingId, setOpenListingId] = useState<string | null>(null)
+  const [favoriteIds,  setFavoriteIds]  = useState<Set<string>>(new Set())
+
+  const requestAuth = (message?: string) => { setAuthMessage(message); setModal('auth') }
+  const handleSeeOffer = (listingId: string) => { setOpenListingId(listingId); setTab('market') }
+
+  const fetchUnread = useCallback(async () => {
+    if (!user) { setUnreadCount(0); return }
+    const supabase = createClient()
+    const { count } = await supabase
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('receiver_id', user.id)
+      .eq('read', false)
+    setUnreadCount(count ?? 0)
+  }, [user])
+
+  useEffect(() => { fetchUnread() }, [fetchUnread])
+
+  const fetchFavorites = useCallback(async () => {
+    if (!user) { setFavoriteIds(new Set()); return }
+    const supabase = createClient()
+    const { data } = await supabase.from('favorites').select('listing_id').eq('user_id', user.id)
+    setFavoriteIds(new Set((data ?? []).map(r => r.listing_id as string)))
+  }, [user])
+
+  useEffect(() => { fetchFavorites() }, [fetchFavorites])
+
+  const toggleFavorite = async (listingId: string) => {
+    if (!user) { requestAuth('Sign in to save favorites'); return }
+    const supabase = createClient()
+    const isFav = favoriteIds.has(listingId)
+    // Optimistic update
+    setFavoriteIds(prev => {
+      const next = new Set(prev)
+      isFav ? next.delete(listingId) : next.add(listingId)
+      return next
+    })
+    if (isFav) {
+      await supabase.from('favorites').delete().eq('user_id', user.id).eq('listing_id', listingId)
+    } else {
+      await supabase.from('favorites').insert({ user_id: user.id, listing_id: listingId })
+    }
+  }
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !localStorage.getItem('pp_welcomed')) {
+      setTimeout(() => setShowWelcome(true), 800)
+    }
+  }, [])
+
+  const closeWelcome = () => {
+    localStorage.setItem('pp_welcomed', '1')
+    setShowWelcome(false)
+  }
 
   const fetchWind = async () => {
     try {
@@ -244,6 +317,13 @@ export default function AppShell({ initialListings }: { initialListings: Listing
     if (data) setListings(data as Listing[])
   }
 
+  const handleSignOut = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    setUser(null)
+    setTab('globe')
+  }
+
   const handleHomeAP = (code: string) => setHomeAp(lookupAirport(code))
 
   const handleRoutCalc = (from: string, to: string) => {
@@ -259,27 +339,31 @@ export default function AppShell({ initialListings }: { initialListings: Listing
   }
 
   if (isMobile) return (
-    <MobileShell
-      params={params} setParams={setParams}
-      homeAp={homeAp} routeDest={routeDest}
-      selAC={selAC} setSelAC={setSelAC}
-      results={results}
-      marketSearch={marketSearch} setMarketSearch={setMarketSearch}
-      contactListing={contactListing} setContactListing={setContactListing}
-      user={user} setUser={setUser}
-      windBR={windBR} windUV={windUV} showWind={showWind}
-      listings={listings}
-      onHomeAP={handleHomeAP}
-      onRoutCalc={handleRoutCalc}
-      onFind={handleFind}
-      openOffers={openOffers}
-      openContact={openContact}
-      onWindToggle={v => { setShowWind(v); if (!v) { setWindBR(null); setWindUV(null) } }}
-      onWindFetch={fetchWind}
-      refreshListings={refreshListings}
-      reachableAirports={reachable}
-      allAirports={ALL_AIRPORTS}
-    />
+    <>
+      <MobileShell
+        params={params} setParams={setParams}
+        homeAp={homeAp} routeDest={routeDest}
+        routeWaypoints={routeWaypoints} onRouteWaypoints={setRouteWaypoints}
+        selAC={selAC} setSelAC={setSelAC}
+        results={results}
+        marketSearch={marketSearch} setMarketSearch={setMarketSearch}
+        contactListing={contactListing} setContactListing={setContactListing}
+        user={user} setUser={setUser}
+        windBR={windBR} windUV={windUV} showWind={showWind}
+        listings={listings}
+        onHomeAP={handleHomeAP}
+        onRoutCalc={handleRoutCalc}
+        onFind={handleFind}
+        openOffers={openOffers}
+        openContact={openContact}
+        onWindToggle={v => { setShowWind(v); if (!v) { setWindBR(null); setWindUV(null) } }}
+        onWindFetch={fetchWind}
+        refreshListings={refreshListings}
+        reachableAirports={reachable}
+        allAirports={ALL_AIRPORTS}
+      />
+      {showWelcome && <WelcomeModal onClose={closeWelcome} />}
+    </>
   )
 
   return (
@@ -300,22 +384,29 @@ export default function AppShell({ initialListings }: { initialListings: Listing
           active={tab === 'globe'}
           onMapLoad={() => {}}
           listingDots={resolveListingDots(listings)}
+          routeWaypoints={routeWaypoints}
+          onSeeOffer={handleSeeOffer}
         />
       </div>
 
       {/* ── Other tab backgrounds ── */}
-      {tab === 'market' && <div style={{ position: 'fixed', inset: 0, background: '#f5f5f7' }} />}
-      {tab === 'jobs'   && <div style={{ position: 'fixed', inset: 0, background: '#f5f5f7' }} />}
+      {tab === 'market'  && <div style={{ position: 'fixed', inset: 0, background: '#f5f5f7' }} />}
+      {tab === 'jobs'    && <div style={{ position: 'fixed', inset: 0, background: '#f5f5f7' }} />}
+      {tab === 'profile'   && <div style={{ position: 'fixed', inset: 0, background: '#f5f5f7' }} />}
+      {tab === 'favorites' && <div style={{ position: 'fixed', inset: 0, background: '#f5f5f7' }} />}
 
       {/* ── Top bar ── */}
       <Header
         activeTab={tab}
         onTabChange={setTab}
         user={user}
-        onAuthClick={() => setModal('auth')}
-        onSellClick={() => setModal(user ? 'sell' : 'auth')}
+        onAuthClick={() => requestAuth()}
+        onProfileClick={() => setTab('profile')}
+        onSellClick={() => (user ? setModal('sell') : requestAuth())}
         onAdminClick={() => setModal('admin')}
-        onMyItemsClick={() => setModal(user ? 'myitems' : 'auth')}
+        onFavoritesClick={() => (user ? setTab('favorites') : requestAuth('Sign in to see your favorites'))}
+        onMessagesClick={() => setMessagesOpen(true)}
+        unreadCount={unreadCount}
       />
 
       {/* ── Globe UI ── */}
@@ -329,6 +420,8 @@ export default function AppShell({ initialListings }: { initialListings: Listing
             onFind={handleFind}
             homeAp={homeAp}
             selAC={selAC}
+            onStopsChange={setStops}
+            onRouteWaypoints={setRouteWaypoints}
           />
           <RightPanel
             results={results}
@@ -371,10 +464,27 @@ export default function AppShell({ initialListings }: { initialListings: Listing
         <MarketTab
           listings={listings}
           onContact={openContact}
-          onSell={() => setModal(user ? 'sell' : 'auth')}
+          onSell={() => (user ? setModal('sell') : requestAuth())}
           user={user}
           initialSearch={marketSearch}
           onSearchChange={setMarketSearch}
+          onAuthRequired={requestAuth}
+          onOpenMessage={l => setMessageListing(l)}
+          openListingId={openListingId}
+          onOpenListingHandled={() => setOpenListingId(null)}
+          favoriteIds={favoriteIds}
+          onToggleFavorite={toggleFavorite}
+        />
+      )}
+
+      {/* ── Favorites tab ── */}
+      {tab === 'favorites' && user && (
+        <FavoritesTab
+          listings={listings}
+          favoriteIds={favoriteIds}
+          onToggleFavorite={toggleFavorite}
+          onOpenListing={handleSeeOffer}
+          onBrowseMarket={() => setTab('market')}
         />
       )}
 
@@ -386,11 +496,24 @@ export default function AppShell({ initialListings }: { initialListings: Listing
         />
       )}
 
+      {/* ── Profile tab ── */}
+      {tab === 'profile' && user && (
+        <DesktopProfile
+          user={user}
+          onMyItemsClick={() => setModal('myitems')}
+          onAdminClick={() => setModal('admin')}
+          onMessagesClick={() => setMessagesOpen(true)}
+          unreadCount={unreadCount}
+          onSignOut={handleSignOut}
+        />
+      )}
+
       {/* ── Modals ── */}
       {modal === 'auth' && (
         <AuthModal
-          onClose={() => setModal('none')}
-          onLogin={(u: User) => { setUser(u); setModal('none') }}
+          message={authMessage}
+          onClose={() => { setModal('none'); setAuthMessage(undefined) }}
+          onLogin={(u: User) => { setUser(u); setModal('none'); setAuthMessage(undefined) }}
         />
       )}
       {modal === 'sell' && user && (
@@ -419,6 +542,25 @@ export default function AppShell({ initialListings }: { initialListings: Listing
           listing={contactListing}
           user={user}
           onClose={() => setModal('none')}
+        />
+      )}
+
+      {/* ── First-visit welcome tour ── */}
+      {showWelcome && <WelcomeModal onClose={closeWelcome} />}
+
+      {/* ── Messages ── */}
+      {messagesOpen && user && (
+        <MessagesPanel
+          userId={user.id}
+          onClose={() => { setMessagesOpen(false); fetchUnread() }}
+          onOpenConversation={l => { setMessagesOpen(false); setMessageListing(l) }}
+        />
+      )}
+      {messageListing && user && (
+        <MessageModal
+          listing={messageListing}
+          buyerId={user.id}
+          onClose={() => { setMessageListing(null); fetchUnread() }}
         />
       )}
     </div>

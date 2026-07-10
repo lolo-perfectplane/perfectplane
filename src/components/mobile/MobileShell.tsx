@@ -1,10 +1,10 @@
 'use client'
 // src/components/mobile/MobileShell.tsx
 import dynamic from 'next/dynamic'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { Params } from '@/components/AppShell'
 import type { APEntry } from '@/lib/airports'
-import { AIRPORTS } from '@/lib/airports'
+import { AIRPORTS, lookupAirport } from '@/lib/airports'
 import type { Listing } from '@/lib/supabase'
 import type { AC } from '@/lib/aircraft'
 import { createClient } from '@/lib/supabase'
@@ -14,6 +14,9 @@ import MobileMarket from './MobileMarket'
 import MobileProfile from './MobileProfile'
 import AuthModal from '@/components/ui/AuthModal'
 import { SellModal, AdminModal, ContactModal, MyItemsModal } from '@/components/listings/Modals'
+import MessageModal, { type MessageListing } from '@/components/ui/MessageModal'
+import MessagesPanel from '@/components/ui/MessagesPanel'
+import MobileFavorites from './MobileFavorites'
 import MobileJobsView from './MobileJobsView'
 
 const GlobeMap = dynamic(() => import('@/components/globe/GlobeMap'), { ssr: false })
@@ -29,10 +32,14 @@ function resolveListingDots(listings: Listing[]) {
     const tokens = l.location.trim().toUpperCase().split(/[\s—\-,/]+/)
     for (const tok of tokens) {
       if (tok.length >= 3 && tok.length <= 4) {
-        const ap = _AIRPORT_COORDS[tok]
-        if (ap) return [{ lon: ap.lon, lat: ap.lat, model: l.model ?? '', price: l.price ?? null }]
+        // Exact match first, then fuzzy fallback — airports.ts is hand-edited
+        // and codes can be renamed/removed, silently dropping pins otherwise.
+        const ap = _AIRPORT_COORDS[tok] ?? lookupAirport(tok)
+        if (ap) return [{ lon: ap.lon, lat: ap.lat, model: l.model ?? '', price: l.price ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id }]
       }
     }
+    const byName = lookupAirport(l.location)
+    if (byName) return [{ lon: byName.lon, lat: byName.lat, model: l.model ?? '', price: l.price ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id }]
     return []
   })
 }
@@ -47,6 +54,8 @@ export interface MobileShellProps {
   setParams: (p: Params) => void
   homeAp: APEntry | null
   routeDest: APEntry | null
+  routeWaypoints?: { lat: number; lon: number; icao: string }[] | null
+  onRouteWaypoints?: (wps: { lat: number; lon: number; icao: string }[] | null) => void
   selAC: (typeof AC)[0] | null
   setSelAC: (ac: (typeof AC)[0] | null) => void
   results: ((typeof AC)[0] & { sc: number })[]
@@ -76,7 +85,7 @@ const ALL_AIRPORTS_EMPTY: { ic: string; la: number; lo: number }[] = []
 
 export default function MobileShell(props: MobileShellProps) {
   const {
-    params, setParams, homeAp, routeDest, selAC, setSelAC,
+    params, setParams, homeAp, routeDest, routeWaypoints, onRouteWaypoints, selAC, setSelAC,
     results, contactListing, setContactListing,
     user, setUser, windBR, windUV, showWind,
     listings, onHomeAP, onRoutCalc, onFind, openOffers, openContact,
@@ -90,6 +99,54 @@ export default function MobileShell(props: MobileShellProps) {
   const [resultsOpen,    setResultsOpen]    = useState(false)
   const [pendingCount,   setPendingCount]   = useState(0)
   const [apVal,          setApVal]          = useState('')
+  const [authMessage,    setAuthMessage]    = useState<string | undefined>(undefined)
+  const [messageListing, setMessageListing] = useState<MessageListing | null>(null)
+  const [messagesOpen,   setMessagesOpen]   = useState(false)
+  const [unreadCount,    setUnreadCount]    = useState(0)
+  const [openListingId,  setOpenListingId]  = useState<string | null>(null)
+  const [favoriteIds,    setFavoriteIds]    = useState<Set<string>>(new Set())
+  const [favoritesOpen,  setFavoritesOpen]  = useState(false)
+
+  const requestAuth = (message?: string) => { setAuthMessage(message); openModal('auth') }
+  const handleSeeOffer = (listingId: string) => { setOpenListingId(listingId); setActiveTab('market') }
+
+  const fetchUnread = useCallback(async () => {
+    if (!user) { setUnreadCount(0); return }
+    const supabase = createClient()
+    const { count } = await supabase
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('receiver_id', user.id)
+      .eq('read', false)
+    setUnreadCount(count ?? 0)
+  }, [user])
+
+  useEffect(() => { fetchUnread() }, [fetchUnread])
+
+  const fetchFavorites = useCallback(async () => {
+    if (!user) { setFavoriteIds(new Set()); return }
+    const supabase = createClient()
+    const { data } = await supabase.from('favorites').select('listing_id').eq('user_id', user.id)
+    setFavoriteIds(new Set((data ?? []).map(r => r.listing_id as string)))
+  }, [user])
+
+  useEffect(() => { fetchFavorites() }, [fetchFavorites])
+
+  const toggleFavorite = async (listingId: string) => {
+    if (!user) { requestAuth('Sign in to save favorites'); return }
+    const supabase = createClient()
+    const isFav = favoriteIds.has(listingId)
+    setFavoriteIds(prev => {
+      const next = new Set(prev)
+      isFav ? next.delete(listingId) : next.add(listingId)
+      return next
+    })
+    if (isFav) {
+      await supabase.from('favorites').delete().eq('user_id', user.id).eq('listing_id', listingId)
+    } else {
+      await supabase.from('favorites').insert({ user_id: user.id, listing_id: listingId })
+    }
+  }
 
   // Lock body scroll when any sheet is open
   useEffect(() => {
@@ -146,10 +203,28 @@ export default function MobileShell(props: MobileShellProps) {
       }}>
         <span style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.03em', color: '#1d1d1f' }}>Perfect<span style={{ color: '#0a84ff' }}>Plane</span></span>
         {user ? (
-          <button onClick={() => setActiveTab('profile')}
-            style={{ width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'rgba(10,132,255,0.12)', color: '#0a84ff', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {user.name.charAt(0).toUpperCase()}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={() => setFavoritesOpen(true)} title="Favorites"
+              style={{ width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'rgba(118,118,128,0.1)', color: '#4b5563', fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              ♡
+            </button>
+            <button onClick={() => setMessagesOpen(true)} title="Messages"
+              style={{ position: 'relative', width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'rgba(118,118,128,0.1)', color: '#4b5563', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              💬
+              {unreadCount > 0 && (
+                <span style={{
+                  position: 'absolute', top: -2, right: -2,
+                  minWidth: 15, height: 15, borderRadius: 8, background: '#ff3b30', color: '#fff',
+                  fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '0 3px', lineHeight: 1, border: '1.5px solid #fff',
+                }}>{unreadCount > 9 ? '9+' : unreadCount}</span>
+              )}
+            </button>
+            <button onClick={() => setActiveTab('profile')}
+              style={{ width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'rgba(10,132,255,0.12)', color: '#0a84ff', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {user.name.charAt(0).toUpperCase()}
+            </button>
+          </div>
         ) : (
           <button onClick={() => openModal('auth')}
             style={{ height: 32, padding: '0 14px', borderRadius: 100, border: 'none', background: '#0a84ff', color: '#fff', fontSize: 16, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}>
@@ -163,6 +238,7 @@ export default function MobileShell(props: MobileShellProps) {
         <GlobeMap
           homeAp={homeAp}
           routeDest={routeDest}
+          routeWaypoints={routeWaypoints}
           selACRange={selAC?.range ?? null}
           windBR={windBR}
           windUV={windUV}
@@ -173,6 +249,7 @@ export default function MobileShell(props: MobileShellProps) {
           active={activeTab === 'globe'}
           onMapLoad={() => {}}
           listingDots={resolveListingDots(listings)}
+          onSeeOffer={handleSeeOffer}
         />
       </div>
 
@@ -280,9 +357,15 @@ export default function MobileShell(props: MobileShellProps) {
         <MobileMarket
           listings={listings}
           onContact={(l) => { openContact(l); openModal('contact') }}
-          onSell={() => openModal(user ? 'sell' : 'auth')}
+          onSell={() => (user ? openModal('sell') : requestAuth())}
           user={user}
           initialSearch={props.marketSearch}
+          onAuthRequired={requestAuth}
+          onOpenMessage={l => setMessageListing(l)}
+          openListingId={openListingId}
+          onOpenListingHandled={() => setOpenListingId(null)}
+          favoriteIds={favoriteIds}
+          onToggleFavorite={toggleFavorite}
         />
       )}
 
@@ -296,9 +379,11 @@ export default function MobileShell(props: MobileShellProps) {
         <MobileProfile
           user={user}
           onAuthClick={() => openModal('auth')}
-          onMyItemsClick={() => openModal(user ? 'myitems' : 'auth')}
+          onMyItemsClick={() => (user ? openModal('myitems') : requestAuth())}
           onAdminClick={() => openModal('admin')}
           onSignOut={handleSignOut}
+          onMessagesClick={() => setMessagesOpen(true)}
+          unreadCount={unreadCount}
         />
       )}
 
@@ -369,6 +454,7 @@ export default function MobileShell(props: MobileShellProps) {
         onFind={handleFind}
         homeAp={homeAp}
         selAC={selAC}
+        onRouteWaypoints={onRouteWaypoints}
       />
 
       <MobileResultsSheet
@@ -384,8 +470,9 @@ export default function MobileShell(props: MobileShellProps) {
       {/* ── Modals ── */}
       {modal === 'auth' && (
         <AuthModal
-          onClose={() => setModal('none')}
-          onLogin={(u: User) => { setUser(u); setModal('none') }}
+          message={authMessage}
+          onClose={() => { setModal('none'); setAuthMessage(undefined) }}
+          onLogin={(u: User) => { setUser(u); setModal('none'); setAuthMessage(undefined) }}
         />
       )}
       {modal === 'sell' && user && (
@@ -399,6 +486,34 @@ export default function MobileShell(props: MobileShellProps) {
       )}
       {modal === 'contact' && contactListing && (
         <ContactModal listing={contactListing} user={user} onClose={() => { setModal('none'); setContactListing(null) }} />
+      )}
+
+      {/* ── Messages ── */}
+      {messagesOpen && user && (
+        <MessagesPanel
+          userId={user.id}
+          onClose={() => { setMessagesOpen(false); fetchUnread() }}
+          onOpenConversation={l => { setMessagesOpen(false); setMessageListing(l) }}
+        />
+      )}
+      {messageListing && user && (
+        <MessageModal
+          listing={messageListing}
+          buyerId={user.id}
+          onClose={() => { setMessageListing(null); fetchUnread() }}
+        />
+      )}
+
+      {/* ── Favorites ── */}
+      {favoritesOpen && user && (
+        <MobileFavorites
+          listings={listings}
+          favoriteIds={favoriteIds}
+          onToggleFavorite={toggleFavorite}
+          onOpenListing={id => { setFavoritesOpen(false); handleSeeOffer(id) }}
+          onClose={() => setFavoritesOpen(false)}
+          onBrowseMarket={() => { setFavoritesOpen(false); setActiveTab('market') }}
+        />
       )}
     </div>
   )

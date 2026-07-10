@@ -6,6 +6,24 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
+/* Listing tooltip popup on the globe — strip Mapbox's default popup chrome
+   so only our custom card renders. */
+.mapboxgl-popup-content {
+  background: transparent !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+.mapboxgl-popup-tip {
+  display: none !important;
+}
+.pp-info-badge {
+  transition: background-color 0.15s, transform 0.15s;
+}
+.pp-info-badge:hover {
+  background-color: rgba(255,255,255,0.12);
+  transform: scale(1.08);
+}
+
 :root {
   --pp-blue: #0a84ff;
   --pp-green: #34c759;

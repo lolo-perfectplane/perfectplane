@@ -4,6 +4,9 @@ import React, { useState, useEffect, useRef } from 'react'
 import type { Listing } from '@/lib/supabase'
 import { createClient } from '@/lib/supabase'
 import { AC } from '@/lib/aircraft'
+import FavoriteButton from '@/components/ui/FavoriteButton'
+import CompareToggle from '@/components/ui/CompareToggle'
+import CompareModal from '@/components/ui/CompareModal'
 
 const AC_TYPE:    Record<string, string> = {}
 const AC_FUEL:    Record<string, string> = {}
@@ -17,7 +20,15 @@ for (const a of AC) {
 }
 
 type User = { id: string; name: string; email: string; role: string }
-type Props = { listings: Listing[]; onContact: (l: Listing) => void; onSell: () => void; user: User | null; initialSearch?: string }
+type Props = {
+  listings: Listing[]; onContact: (l: Listing) => void; onSell: () => void; user: User | null; initialSearch?: string
+  onAuthRequired: (message?: string) => void
+  onOpenMessage: (l: { id: string; model: string; year: number; price: number | null; seller_id: string | null }) => void
+  openListingId?: string | null
+  onOpenListingHandled?: () => void
+  favoriteIds: Set<string>
+  onToggleFavorite: (listingId: string) => void
+}
 type TypeFilter   = 'all' | 'jet' | 'turbo' | 'piston'
 type EngineFilter = 0 | 1 | 2 | 3 | 4
 type FuelFilter   = 'jet-a' | 'avgas' | null
@@ -37,7 +48,10 @@ function fmtPrice(p: number | null) {
 }
 
 // ── Listing card with photo navigation ────────────────────────
-function MobileListingCard({ l, onClick }: { l: Listing; onClick: () => void }) {
+function MobileListingCard({ l, onClick, isFavorite, onToggleFavorite, isComparing, compareDisabled, onToggleCompare }: {
+  l: Listing; onClick: () => void; isFavorite: boolean; onToggleFavorite: () => void
+  isComparing: boolean; compareDisabled: boolean; onToggleCompare: () => void
+}) {
   const photos: string[] = l.photos ?? []
   const [idx, setIdx] = useState(0)
   const [touchX, setTouchX] = useState<number | null>(null)
@@ -77,6 +91,8 @@ function MobileListingCard({ l, onClick }: { l: Listing; onClick: () => void }) 
           </>
         )}
         <div style={{ position: 'absolute', top: 7, right: 7, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 6 }}>{fmtPrice(l.price ?? null)}</div>
+        <FavoriteButton active={isFavorite} onToggle={onToggleFavorite} size={26} style={{ position: 'absolute', top: 7, left: 7 }} />
+        <CompareToggle active={isComparing} disabled={compareDisabled} onToggle={onToggleCompare} size={26} style={{ position: 'absolute', bottom: 7, left: 7 }} />
       </div>
       {/* Content */}
       <div style={{ padding: '9px 10px 11px', display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
@@ -90,6 +106,12 @@ function MobileListingCard({ l, onClick }: { l: Listing; onClick: () => void }) 
             <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 7px', borderRadius: 100, background: 'rgba(255,214,10,0.15)', color: '#b07800' }}>⭐ Certified</span>
           )}
           <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 7px', borderRadius: 100, background: 'rgba(52,199,89,0.12)', color: '#248a3d' }}>Community</span>
+          {(l as any).ifr && (
+            <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 100, background: 'rgba(10,132,255,0.12)', color: '#0a84ff' }}>IFR ✓</span>
+          )}
+          {((l as any).contact_pref ?? 'email') === 'message' && (
+            <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 100, background: 'rgba(52,199,89,0.12)', color: '#248a3d' }}>🔒 Private contact</span>
+          )}
         </div>
       </div>
     </div>
@@ -119,6 +141,7 @@ type FilterSheetProps = {
   engFilter: EngineFilter; setEngFilter: (v: EngineFilter) => void
   fuelFilter: FuelFilter; setFuelFilter: (v: FuelFilter | null) => void
   gearFilter: GearFilter; setGearFilter: (v: GearFilter | null) => void
+  ifrOnly: boolean; setIfrOnly: (v: boolean) => void
   maxHours: number; setMaxHours: (v: number) => void
   yearFrom: number; setYearFrom: (v: number) => void
   yearTo: number; setYearTo: (v: number) => void
@@ -127,6 +150,7 @@ type FilterSheetProps = {
 function FilterSheet({ onClose, activeFilterCount, clearAll, filtered,
   typeFilter, setTypeFilter, engFilter, setEngFilter,
   fuelFilter, setFuelFilter, gearFilter, setGearFilter,
+  ifrOnly, setIfrOnly,
   maxHours, setMaxHours, yearFrom, setYearFrom, yearTo, setYearTo,
 }: FilterSheetProps) {
   const [visible,  setVisible]  = useState(false)
@@ -204,6 +228,7 @@ function FilterSheet({ onClose, activeFilterCount, clearAll, filtered,
               <Chip label="Jet"       active={typeFilter === 'jet'}    onToggle={() => setTypeFilter(typeFilter === 'jet'    ? 'all' : 'jet')} />
               <Chip label="Turboprop" active={typeFilter === 'turbo'}  onToggle={() => setTypeFilter(typeFilter === 'turbo'  ? 'all' : 'turbo')} />
               <Chip label="Piston"    active={typeFilter === 'piston'} onToggle={() => setTypeFilter(typeFilter === 'piston' ? 'all' : 'piston')} />
+              <Chip label="IFR ✓"     active={ifrOnly} onToggle={() => setIfrOnly(!ifrOnly)} />
             </div>
           </div>
           <div>
@@ -266,7 +291,17 @@ function FilterSheet({ onClose, activeFilterCount, clearAll, filtered,
 }
 
 // ── Listing detail bottom sheet ───────────────────────────────
-function ListingSheet({ listing, onClose, onContact }: { listing: Listing; onClose: () => void; onContact: (l: Listing) => void }) {
+function ListingSheet({ listing, onClose, onContact, user, onAuthRequired, onOpenMessage, isFavorite, onToggleFavorite }: {
+  listing: Listing
+  onClose: () => void
+  onContact: (l: Listing) => void
+  user: User | null
+  onAuthRequired: (message?: string) => void
+  onOpenMessage: (l: { id: string; model: string; year: number; price: number | null; seller_id: string | null }) => void
+  isFavorite: boolean
+  onToggleFavorite: () => void
+}) {
+  const pref = (listing as any).contact_pref ?? 'email'
   const [photoIdx,  setPhotoIdx]  = useState(0)
   const [swipeX,    setSwipeX]    = useState<number | null>(null)
   const [visible,   setVisible]   = useState(false)
@@ -398,6 +433,7 @@ function ListingSheet({ listing, onClose, onContact }: { listing: Listing; onClo
             <div style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', color: '#fff', fontSize: 13, fontWeight: 700, padding: '3px 10px', borderRadius: 8, zIndex: 4 }}>
               {fmtPrice(listing.price ?? null)}
             </div>
+            <FavoriteButton active={isFavorite} onToggle={onToggleFavorite} size={32} style={{ position: 'absolute', top: 10, right: 10, zIndex: 4 }} />
           </div>
 
           <div style={{ padding: '16px 18px 0' }}>
@@ -439,16 +475,34 @@ function ListingSheet({ listing, onClose, onContact }: { listing: Listing; onClo
             ))}
 
             {/* Contact button */}
-            <button onClick={() => { onContact(listing); close() }} style={{
-              width: '100%', height: 50, background: '#0a84ff', border: 'none',
-              borderRadius: 14, color: '#fff', fontFamily: 'inherit',
-              fontSize: 16, fontWeight: 600, cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(10,132,255,0.35)',
-              marginTop: 4,
-              marginBottom: `calc(${TAB_H}px + env(safe-area-inset-bottom, 0px))`,
-            }}>
-              Contact seller
-            </button>
+            {pref === 'email' ? (
+              <button onClick={() => { onContact(listing); close() }} style={{
+                width: '100%', height: 50, background: '#0a84ff', border: 'none',
+                borderRadius: 14, color: '#fff', fontFamily: 'inherit',
+                fontSize: 16, fontWeight: 600, cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(10,132,255,0.35)',
+                marginTop: 4,
+                marginBottom: `calc(${TAB_H}px + env(safe-area-inset-bottom, 0px))`,
+              }}>
+                Contact seller
+              </button>
+            ) : (
+              <button onClick={() => {
+                if (!user) { onAuthRequired('Sign in to message this seller'); return }
+                onOpenMessage({ id: listing.id, model: listing.model, year: listing.year, price: listing.price, seller_id: (listing as any).seller_id ?? null })
+                close()
+              }} style={{
+                width: '100%', height: 50, background: '#0a84ff', border: 'none',
+                borderRadius: 14, color: '#fff', fontFamily: 'inherit',
+                fontSize: 16, fontWeight: 600, cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(10,132,255,0.35)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                marginTop: 4,
+                marginBottom: `calc(${TAB_H}px + env(safe-area-inset-bottom, 0px))`,
+              }}>
+                💬 Send message
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -456,18 +510,30 @@ function ListingSheet({ listing, onClose, onContact }: { listing: Listing; onClo
   )
 }
 
-export default function MobileMarket({ listings: initialListings, onContact, onSell, initialSearch = '' }: Props) {
+export default function MobileMarket({ listings: initialListings, onContact, onSell, user, initialSearch = '', onAuthRequired, onOpenMessage, openListingId, onOpenListingHandled, favoriteIds, onToggleFavorite }: Props) {
   const [search,      setSearch]      = useState(initialSearch)
   const [brand,       setBrand]       = useState<string | null>(null)
   const [listings,    setListings]    = useState<Listing[]>(initialListings)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [selListing,  setSelListing]  = useState<Listing | null>(null)
+  const [compareIds,  setCompareIds]  = useState<string[]>([])
+  const [compareOpen, setCompareOpen] = useState(false)
+
+  const MAX_COMPARE = 3
+  const toggleCompare = (id: string) => {
+    setCompareIds(prev => {
+      if (prev.includes(id)) return prev.filter(x => x !== id)
+      if (prev.length >= MAX_COMPARE) return prev
+      return [...prev, id]
+    })
+  }
 
   // Filter state — mirrors desktop
   const [typeFilter,  setTypeFilter]  = useState<TypeFilter>('all')
   const [engFilter,   setEngFilter]   = useState<EngineFilter>(0)
   const [fuelFilter,  setFuelFilter]  = useState<FuelFilter>(null)
   const [gearFilter,  setGearFilter]  = useState<GearFilter>(null)
+  const [ifrOnly,     setIfrOnly]     = useState(false)
   const [maxHours,    setMaxHours]    = useState(MAX_HOURS)
   const [yearFrom,    setYearFrom]    = useState(1960)
   const [yearTo,      setYearTo]      = useState(CURRENT_YEAR)
@@ -481,11 +547,18 @@ export default function MobileMarket({ listings: initialListings, onContact, onS
     })
   }, [])
 
+  // Open a specific listing when requested from outside (e.g. "See offer" on the globe)
+  useEffect(() => {
+    if (!openListingId) return
+    const found = listings.find(l => l.id === openListingId)
+    if (found) { setSelListing(found); onOpenListingHandled?.() }
+  }, [openListingId, listings, onOpenListingHandled])
+
   const activeFilterCount = (typeFilter !== 'all' ? 1 : 0) + (engFilter !== 0 ? 1 : 0) +
-    (fuelFilter ? 1 : 0) + (gearFilter ? 1 : 0) +
+    (fuelFilter ? 1 : 0) + (gearFilter ? 1 : 0) + (ifrOnly ? 1 : 0) +
     (maxHours < MAX_HOURS ? 1 : 0) + (yearFrom > 1960 || yearTo < CURRENT_YEAR ? 1 : 0)
 
-  const clearAll = () => { setTypeFilter('all'); setEngFilter(0); setFuelFilter(null); setGearFilter(null); setMaxHours(MAX_HOURS); setYearFrom(1960); setYearTo(CURRENT_YEAR) }
+  const clearAll = () => { setTypeFilter('all'); setEngFilter(0); setFuelFilter(null); setGearFilter(null); setIfrOnly(false); setMaxHours(MAX_HOURS); setYearFrom(1960); setYearTo(CURRENT_YEAR) }
 
   // Apply all filters except brand/search — used for brand grid counts
   const preFiltered = listings
@@ -493,6 +566,7 @@ export default function MobileMarket({ listings: initialListings, onContact, onS
     .filter(l => engFilter === 0 || (l.engines ?? AC_ENGINES[l.model]) === engFilter)
     .filter(l => !fuelFilter || (l.fuel ?? AC_FUEL[l.model]) === fuelFilter)
     .filter(l => !gearFilter || (l.gear ?? AC_GEAR[l.model]) === gearFilter)
+    .filter(l => !ifrOnly || (l as any).ifr === true)
     .filter(l => maxHours >= MAX_HOURS || (l.hours ?? 0) <= maxHours)
     .filter(l => !l.year || (l.year >= yearFrom && l.year <= yearTo))
 
@@ -571,15 +645,76 @@ export default function MobileMarket({ listings: initialListings, onContact, onS
         {(!showBrandGrid || brand) && filtered.length > 0 && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
             {filtered.map(l => (
-              <MobileListingCard key={l.id} l={l} onClick={() => setSelListing(l)} />
+              <MobileListingCard key={l.id} l={l} onClick={() => setSelListing(l)}
+                isFavorite={favoriteIds.has(l.id)} onToggleFavorite={() => onToggleFavorite(l.id)}
+                isComparing={compareIds.includes(l.id)}
+                compareDisabled={!compareIds.includes(l.id) && compareIds.length >= MAX_COMPARE}
+                onToggleCompare={() => toggleCompare(l.id)} />
             ))}
           </div>
         )}
 
         {selListing && (
-          <ListingSheet listing={selListing} onClose={() => setSelListing(null)} onContact={onContact} />
+          <ListingSheet
+            listing={selListing}
+            onClose={() => setSelListing(null)}
+            onContact={onContact}
+            user={user}
+            onAuthRequired={onAuthRequired}
+            onOpenMessage={onOpenMessage}
+            isFavorite={favoriteIds.has(selListing.id)}
+            onToggleFavorite={() => onToggleFavorite(selListing.id)}
+          />
+        )}
+
+        {compareOpen && compareIds.length >= 2 && (
+          <CompareModal
+            listings={compareIds.map(id => listings.find(l => l.id === id)).filter((l): l is Listing => !!l)}
+            onClose={() => setCompareOpen(false)}
+            onRemove={id => setCompareIds(prev => {
+              const next = prev.filter(x => x !== id)
+              if (next.length < 2) setCompareOpen(false)
+              return next
+            })}
+            onViewListing={id => {
+              const found = listings.find(l => l.id === id)
+              if (found) { setSelListing(found); setCompareOpen(false) }
+            }}
+          />
         )}
       </div>
+
+      {/* Compare bar */}
+      {compareIds.length > 0 && (
+        <div style={{
+          position: 'fixed',
+          bottom: TAB_H + 14 + 58,
+          left: '50%', transform: 'translateX(-50%)',
+          zIndex: 50, display: 'flex', alignItems: 'center', gap: 8,
+          background: 'rgba(20,20,22,0.9)', backdropFilter: 'blur(20px)',
+          borderRadius: 100, padding: '8px 8px 8px 16px',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+        }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap' }}>
+            {compareIds.length} of {MAX_COMPARE}
+          </span>
+          <button onClick={() => setCompareIds([])} style={{
+            background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)',
+            fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', padding: '0 4px',
+          }}>Clear</button>
+          <button
+            onClick={() => setCompareOpen(true)}
+            disabled={compareIds.length < 2}
+            style={{
+              height: 34, padding: '0 16px', borderRadius: 100, border: 'none',
+              background: compareIds.length < 2 ? 'rgba(10,132,255,0.35)' : '#0a84ff',
+              color: '#fff', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+              cursor: compareIds.length < 2 ? 'not-allowed' : 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >⚖ Compare</button>
+        </div>
+      )}
 
       {/* "Find my perfect plane" pill */}
       <button onClick={() => setFiltersOpen(true)} style={{
@@ -616,6 +751,7 @@ export default function MobileMarket({ listings: initialListings, onContact, onS
           engFilter={engFilter}   setEngFilter={setEngFilter}
           fuelFilter={fuelFilter} setFuelFilter={setFuelFilter}
           gearFilter={gearFilter} setGearFilter={setGearFilter}
+          ifrOnly={ifrOnly}       setIfrOnly={setIfrOnly}
           maxHours={maxHours}     setMaxHours={setMaxHours}
           yearFrom={yearFrom}     setYearFrom={setYearFrom}
           yearTo={yearTo}         setYearTo={setYearTo}

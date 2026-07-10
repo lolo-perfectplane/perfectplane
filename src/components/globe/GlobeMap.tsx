@@ -9,11 +9,63 @@ type Airport  = { ic: string; la: number; lo: number }
 type WindPoint = { lat: number; lon: number; u: number; v: number; spd: number }
 type WindUV   = WindPoint[] | null
 
-type ListingDot = { lon: number; lat: number; model: string; price: number | null }
+type ListingDot = {
+  lon: number; lat: number; model: string; price: number | null
+  condition?: string | null; reg?: string; location?: string; listingId?: string
+}
+
+// Info-badge color by listing condition
+const CONDITION_COLORS: Record<string, string> = {
+  'Excellent': '#34c759',
+  'Very Good': '#0a84ff',
+  'Good':      '#ff9f0a',
+  'Fair':      '#ff3b30',
+}
+const DEFAULT_CONDITION_COLOR = 'rgba(255,255,255,0.4)'
+
+function fmtListingPrice(price: number | null): string {
+  if (price == null) return ''
+  return price >= 1_000_000 ? `$${(price / 1_000_000).toFixed(1)}M` : `$${Math.round(price / 1000)}K`
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
+}
+
+function listingPopupHTML(
+  props: { model?: string; price?: number | null; condition?: string | null; reg?: string; location?: string; listingId?: string },
+  uid: string,
+): string {
+  const color   = (props.condition && CONDITION_COLORS[props.condition]) || DEFAULT_CONDITION_COLOR
+  const condStr = escapeHtml(props.condition || '—')
+  const regStr  = escapeHtml(props.reg || '—')
+  const locStr  = escapeHtml(props.location || '—')
+  const detailsId = `pp-listing-details-${uid}`
+  const seeOfferBtn = props.listingId
+    ? `<button onclick="event.stopPropagation();window.__ppSeeOffer && window.__ppSeeOffer('${escapeHtml(props.listingId)}')"
+        style="margin-top:12px;width:100%;height:34px;border-radius:9px;border:none;background:#0a84ff;color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">See offer</button>`
+    : ''
+  return `
+    <div style="position:relative;background:rgba(30,35,45,0.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:0.5px solid rgba(255,255,255,0.12);border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,0.4);padding:14px 16px;min-width:200px;font-family:'Inter',-apple-system,sans-serif;">
+      <div style="font-size:20px;font-weight:700;color:rgba(255,255,255,0.95);letter-spacing:-0.02em;padding-right:26px;">${escapeHtml(props.model ?? '')}</div>
+      <div style="font-size:14px;color:rgba(255,255,255,0.5);margin-top:4px;">${fmtListingPrice(props.price ?? null)}</div>
+      <div class="pp-info-badge" title="Condition: ${condStr}"
+        onclick="event.stopPropagation();var d=document.getElementById('${detailsId}');d.style.display=d.style.display==='none'?'block':'none';"
+        style="position:absolute;top:12px;right:12px;width:28px;height:28px;border-radius:50%;border:1.5px solid ${color};color:${color};display:flex;align-items:center;justify-content:center;font-size:14px;line-height:1;cursor:pointer;">ⓘ</div>
+      <div id="${detailsId}" style="display:none;margin-top:10px;padding-top:10px;border-top:0.5px solid rgba(255,255,255,0.14);font-size:12px;color:rgba(255,255,255,0.65);line-height:1.7;">
+        Condition: <b style="color:${color};">${condStr}</b><br/>
+        Reg: ${regStr}<br/>
+        Location: ${locStr}
+      </div>
+      ${seeOfferBtn}
+    </div>
+  `
+}
 
 type Props = {
   homeAp:            { lat: number; lon: number; icao: string } | null
   routeDest:         { lat: number; lon: number; icao: string } | null
+  routeWaypoints?:   { lat: number; lon: number; icao: string }[] | null
   selACRange:        number | null
   windBR:            number[] | null
   windUV:            WindUV
@@ -24,6 +76,7 @@ type Props = {
   onMapLoad:         (map: mapboxgl.Map) => void
   active?:           boolean
   listingDots?:      ListingDot[]
+  onSeeOffer?:       (listingId: string) => void
 }
 
 // ── Wind field grid ───────────────────────────────────────────
@@ -175,10 +228,18 @@ function dotsToGeoJSON(dots: ListingDot[]): GeoJSON.FeatureCollection {
         lon += JITTER * Math.cos(angle)
         lat += JITTER * Math.sin(angle)
       }
-      const price = dot.price
-        ? (dot.price >= 1_000_000 ? `$${(dot.price / 1_000_000).toFixed(1)}M` : `$${Math.round(dot.price / 1000)}K`)
-        : ''
-      features.push({ type: 'Feature', geometry: { type: 'Point', coordinates: [lon, lat] }, properties: { label: price, model: dot.model } })
+      features.push({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [lon, lat] },
+        properties: {
+          model: dot.model,
+          price: dot.price,
+          condition: dot.condition ?? null,
+          reg: dot.reg ?? '',
+          location: dot.location ?? '',
+          listingId: dot.listingId ?? '',
+        },
+      })
     })
   })
   return { type: 'FeatureCollection', features }
@@ -192,10 +253,17 @@ function applyDots(map: mapboxgl.Map, dots: ListingDot[]) {
 
 // ── Component ─────────────────────────────────────────────────
 export default function GlobeMap({
-  homeAp, routeDest, selACRange, windBR, windUV,
+  homeAp, routeDest, routeWaypoints, selACRange, windBR, windUV,
   reachableAirports, allAirports, showWind, onMapLoad, active = true,
-  listingDots = [],
+  listingDots = [], onSeeOffer,
 }: Props) {
+  // Bridge for the raw-HTML mapbox popup button to reach back into React —
+  // the popup content is plain HTML/onclick, not JSX, so it can't call props directly.
+  useEffect(() => {
+    (window as any).__ppSeeOffer = (listingId: string) => onSeeOffer?.(listingId)
+    return () => { delete (window as any).__ppSeeOffer }
+  }, [onSeeOffer])
+
   const containerRef    = useRef<HTMLDivElement>(null)
   const canvasRef       = useRef<HTMLCanvasElement>(null)
   const mapRef          = useRef<mapboxgl.Map | null>(null)
@@ -205,6 +273,7 @@ export default function GlobeMap({
   const latestDotsRef   = useRef<ListingDot[]>([])
   const gridRef         = useRef<WindGrid | null>(null)
   const animRef         = useRef<number | null>(null)
+  const listingPopupRef = useRef<mapboxgl.Popup | null>(null)
   // Pending data to apply once style is ready
   const pendingAirports  = useRef<GeoJSON.FeatureCollection | null>(null)
   const pendingRings     = useRef<GeoJSON.FeatureCollection | null>(null)
@@ -242,7 +311,43 @@ export default function GlobeMap({
 
       // Route
       map.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
-      map.addLayer({ id: 'route-line', type: 'line', source: 'route', paint: { 'line-color': '#ffb800', 'line-width': 1.5, 'line-opacity': 0.8, 'line-dasharray': [5, 3] } })
+      map.addLayer({ id: 'route-line', type: 'line', source: 'route', paint: { 'line-color': '#ff3b30', 'line-width': 1.5, 'line-opacity': 0.8, 'line-dasharray': [5, 3] } })
+
+      // Route stopovers — intermediate waypoints on a multi-leg route
+      map.addSource('route-stops', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+      map.addLayer({
+        id: 'route-stops-dots', type: 'circle', source: 'route-stops',
+        paint: { 'circle-radius': 5, 'circle-color': '#ff9f0a', 'circle-stroke-width': 1.5, 'circle-stroke-color': '#fff' },
+      })
+      map.addLayer({
+        id: 'route-stops-labels', type: 'symbol', source: 'route-stops',
+        layout: {
+          'text-field':  ['get', 'icao'],
+          'text-font':   ['DIN Pro Medium', 'Arial Unicode MS Regular'],
+          'text-size':   10,
+          'text-offset': [0, -1.3],
+          'text-anchor': 'bottom',
+        },
+        paint: { 'text-color': '#ff9f0a', 'text-halo-color': '#000', 'text-halo-width': 1.5 },
+      })
+
+      // Route destination — final waypoint, in red
+      map.addSource('route-dest', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+      map.addLayer({
+        id: 'route-dest-dot', type: 'circle', source: 'route-dest',
+        paint: { 'circle-radius': 6, 'circle-color': '#ff3b30', 'circle-stroke-width': 1.5, 'circle-stroke-color': '#fff' },
+      })
+      map.addLayer({
+        id: 'route-dest-label', type: 'symbol', source: 'route-dest',
+        layout: {
+          'text-field':  ['get', 'icao'],
+          'text-font':   ['DIN Pro Medium', 'Arial Unicode MS Regular'],
+          'text-size':   10,
+          'text-offset': [0, -1.5],
+          'text-anchor': 'bottom',
+        },
+        paint: { 'text-color': '#ff3b30', 'text-halo-color': '#000', 'text-halo-width': 1.5 },
+      })
 
       // Listing offer dots — added before the airport layers so airport dots
       // always render on top of them, and sized/faded by zoom so they only
@@ -251,7 +356,7 @@ export default function GlobeMap({
       map.addLayer({
         id: 'listing-dots', type: 'circle', source: 'listings',
         paint: {
-          'circle-radius':       ['interpolate', ['linear'], ['zoom'], 2, 0, 3.5, 1.5, 5, 3.75, 8, 6],
+          'circle-radius':       ['interpolate', ['linear'], ['zoom'], 2, 0, 3.5, 3.375, 5, 8.4, 8, 13.5],
           'circle-color':        '#30d158',
           'circle-stroke-width': 2,
           'circle-stroke-color': '#ffffff',
@@ -259,23 +364,23 @@ export default function GlobeMap({
           'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], 2, 0, 3.5, 0.6, 5, 1],
         },
       })
+      // Small airplane glyph centered inside each listing dot
       map.addLayer({
-        id: 'listing-labels', type: 'symbol', source: 'listings',
+        id: 'listing-plane-icons', type: 'symbol', source: 'listings',
         layout: {
-          'text-field':  ['get', 'label'],
-          'text-font':   ['DIN Pro Medium', 'Arial Unicode MS Regular'],
-          'text-size':   10,
-          'text-offset': [0, -1.8],
-          'text-anchor': 'bottom',
+          'text-field':          '✈',
+          'text-font':           ['Arial Unicode MS Regular'],
+          'text-size':           ['interpolate', ['linear'], ['zoom'], 2, 0, 3.5, 10.5, 5, 16.5, 8, 21],
+          'text-anchor':         'center',
+          'text-allow-overlap':  true,
+          'text-ignore-placement': true,
+          'text-rotate':         -45,
         },
         paint: {
-          'text-color':      '#0a7d3c',
-          'text-halo-color': '#ffffff',
-          'text-halo-width': 3,
-          'text-opacity':    ['interpolate', ['linear'], ['zoom'], 3.5, 0, 5, 1],
+          'text-color':   '#ffffff',
+          'text-opacity': ['interpolate', ['linear'], ['zoom'], 2, 0, 3.5, 0.6, 5, 1],
         },
       })
-
       // Airports — added after listing dots so they always draw on top.
       map.addSource('airports', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
       map.addLayer({
@@ -303,6 +408,31 @@ export default function GlobeMap({
           'text-halo-color':  '#000',
           'text-halo-width':  1.5,
         },
+      })
+
+      // Listing dot click → tooltip card popup
+      map.on('click', 'listing-dots', (e) => {
+        const feature = e.features?.[0]
+        if (!feature || feature.geometry.type !== 'Point') return
+        const coords = feature.geometry.coordinates.slice() as [number, number]
+        const props  = feature.properties as { model?: string; price?: number | null; condition?: string | null; reg?: string; location?: string; listingId?: string }
+        const uid    = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`
+
+        listingPopupRef.current?.remove()
+        listingPopupRef.current = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, offset: [0, -10] })
+          .setLngLat(coords)
+          .setHTML(listingPopupHTML(props, uid))
+          .addTo(map)
+      })
+      map.on('mouseenter', 'listing-dots', () => { map.getCanvas().style.cursor = 'pointer' })
+      map.on('mouseleave', 'listing-dots', () => { map.getCanvas().style.cursor = '' })
+      // Click elsewhere on the map (not on a listing dot) closes the popup
+      map.on('click', (e) => {
+        const hits = map.queryRenderedFeatures(e.point, { layers: ['listing-dots'] })
+        if (hits.length === 0 && listingPopupRef.current) {
+          listingPopupRef.current.remove()
+          listingPopupRef.current = null
+        }
       })
 
       mapRef.current  = map
@@ -375,21 +505,19 @@ export default function GlobeMap({
   }, [homeAp, allAirports, reachableAirports])
 
   // ── Route arc ──────────────────────────────────────────────
-  useEffect(() => {
-    if (!homeAp || !routeDest) { setData('route', { type: 'FeatureCollection', features: [] }); return }
-    // Great-circle interpolation for accurate globe arc
+  // Great-circle interpolation between two points — used for each leg below.
+  const gcArc = (p1: { lat: number; lon: number }, p2: { lat: number; lon: number }, steps = 100): [number, number][] => {
     const coords: [number, number][] = []
-    const lat1 = homeAp.lat * Math.PI / 180
-    const lon1 = homeAp.lon * Math.PI / 180
-    const lat2 = routeDest.lat * Math.PI / 180
-    const lon2 = routeDest.lon * Math.PI / 180
+    const lat1 = p1.lat * Math.PI / 180
+    const lon1 = p1.lon * Math.PI / 180
+    const lat2 = p2.lat * Math.PI / 180
+    const lon2 = p2.lon * Math.PI / 180
     const d = Math.acos(Math.max(-1, Math.min(1,
       Math.sin(lat1)*Math.sin(lat2) + Math.cos(lat1)*Math.cos(lat2)*Math.cos(lon2-lon1)
     )))
-    const steps = 100
     for (let i = 0; i <= steps; i++) {
       const t = i / steps
-      if (d < 0.0001) { coords.push([homeAp.lon, homeAp.lat]); continue }
+      if (d < 0.0001) { coords.push([p1.lon, p1.lat]); continue }
       const A = Math.sin((1-t)*d) / Math.sin(d)
       const B = Math.sin(t*d)     / Math.sin(d)
       const x = A*Math.cos(lat1)*Math.cos(lon1) + B*Math.cos(lat2)*Math.cos(lon2)
@@ -399,12 +527,44 @@ export default function GlobeMap({
       const lonI = Math.atan2(y, x) * 180/Math.PI
       coords.push([lonI, latI])
     }
+    return coords
+  }
+
+  useEffect(() => {
+    // Multi-leg stopover route takes priority; falls back to the direct homeAp→routeDest arc
+    const waypoints = routeWaypoints && routeWaypoints.length >= 2
+      ? routeWaypoints
+      : (homeAp && routeDest ? [homeAp, routeDest] : null)
+
+    if (!waypoints) {
+      setData('route', { type: 'FeatureCollection', features: [] })
+      setData('route-stops', { type: 'FeatureCollection', features: [] })
+      setData('route-dest', { type: 'FeatureCollection', features: [] })
+      return
+    }
+
+    const coords: [number, number][] = []
+    for (let i = 0; i < waypoints.length - 1; i++) {
+      const legCoords = gcArc(waypoints[i], waypoints[i + 1])
+      coords.push(...(i === 0 ? legCoords : legCoords.slice(1)))
+    }
     setData('route', { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} }] })
-    // Use the great-circle midpoint (coords[50]) rather than the arithmetic mean,
-    // which gives the wrong hemisphere for trans-oceanic routes (e.g. LAX→NRT)
-    const mid = coords[Math.floor(steps / 2)]
+
+    // Intermediate stopovers only (exclude origin and destination)
+    const stopFeatures: GeoJSON.Feature[] = waypoints.slice(1, -1).map(wp => ({
+      type: 'Feature', geometry: { type: 'Point', coordinates: [wp.lon, wp.lat] }, properties: { icao: wp.icao },
+    }))
+    setData('route-stops', { type: 'FeatureCollection', features: stopFeatures })
+
+    // Final destination — red marker
+    const dest = waypoints[waypoints.length - 1]
+    setData('route-dest', { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [dest.lon, dest.lat] }, properties: { icao: dest.icao } }] })
+
+    // Use the great-circle midpoint of the full path (not the arithmetic mean,
+    // which gives the wrong hemisphere for trans-oceanic routes e.g. LAX→NRT)
+    const mid = coords[Math.floor(coords.length / 2)]
     mapRef.current?.flyTo({ center: [mid[0], mid[1]], zoom: 3.5, speed: 0.8 })
-  }, [homeAp, routeDest])
+  }, [homeAp, routeDest, routeWaypoints])
 
   // ── Pan to home ────────────────────────────────────────────
   useEffect(() => {

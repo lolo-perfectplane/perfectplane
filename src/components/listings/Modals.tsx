@@ -58,9 +58,13 @@ const primaryBtn: React.CSSProperties = {
 // ── SellModal ─────────────────────────────────────────────────
 type SellProps = { user: User; onClose: () => void; onSuccess: () => void }
 
+// Default to a common single-engine model so the form doesn't show
+// Engine 2 / Prop 2 fields before the user has picked their aircraft.
+const DEFAULT_MODEL = AC.find(a => a.engines === 1)?.name ?? AC[0].name
+
 export function SellModal({ user, onClose, onSuccess }: SellProps) {
-  const [model,           setModel]          = useState(AC[0].name)
-  const [modelQuery,      setModelQuery]      = useState(AC[0].name)
+  const [model,           setModel]          = useState(DEFAULT_MODEL)
+  const [modelQuery,      setModelQuery]      = useState(DEFAULT_MODEL)
   const [modelOpen,       setModelOpen]       = useState(false)
   const [year,            setYear]            = useState('')
   const [reg,             setReg]             = useState('')
@@ -69,7 +73,9 @@ export function SellModal({ user, onClose, onSuccess }: SellProps) {
   const [loc,             setLoc]             = useState<APEntry | null>(null)
   const [equip,           setEquip]           = useState('')
   const [cond,            setCond]            = useState('Excellent')
+  const [ifr,             setIfr]             = useState(false)
   const [contact,         setContact]         = useState(user.email)
+  const [contactPref,     setContactPref]     = useState<'email' | 'message'>('email')
   const [photos,          setPhotos]          = useState<string[]>([])
   const [certReq,         setCertReq]         = useState(false)
   const [msg,             setMsg]             = useState<{ text: string; ok: boolean } | null>(null)
@@ -114,6 +120,8 @@ export function SellModal({ user, onClose, onSuccess }: SellProps) {
           price: +price, location: `${loc.icao} — ${loc.name}`,
           equip: showEquip ? equip : null,
           condition: cond,
+          ifr,
+          contact_pref: contactPref,
           contactEmail: contact, sellerId: user.id,
           sellerName: user.name, sellerEmail: user.email,
           photos: photos.filter(Boolean),
@@ -214,11 +222,11 @@ export function SellModal({ user, onClose, onSuccess }: SellProps) {
 
           {/* Total Time + Price */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-            <div>
+            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
               <label style={lbl}>Total airframe time (hrs)</label>
               <input style={inp} type="number" value={hours} onChange={e => setHours(e.target.value)} placeholder="1250" />
             </div>
-            <div>
+            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
               <label style={lbl}>Asking price (USD)</label>
               <input style={inp} type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="450000" />
             </div>
@@ -263,16 +271,54 @@ export function SellModal({ user, onClose, onSuccess }: SellProps) {
           </div>
 
           {/* Condition + Email */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: contactPref === 'message' ? '1fr' : '1fr 1fr', gap: 10, marginBottom: 16 }}>
             <div>
               <label style={lbl}>Condition</label>
               <select value={cond} onChange={e => setCond(e.target.value)} style={selStyle}>
                 {['Excellent','Very Good','Good','Fair'].map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
-            <div>
-              <label style={lbl}>Contact email</label>
-              <input style={inp} type="email" value={contact} onChange={e => setContact(e.target.value)} />
+            {contactPref === 'email' && (
+              <div>
+                <label style={lbl}>Contact email</label>
+                <input style={inp} type="email" value={contact} onChange={e => setContact(e.target.value)} />
+              </div>
+            )}
+          </div>
+
+          {/* Contact preference */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={lbl}>Buyers can contact you via</label>
+            <div style={{ display: 'flex', background: 'rgba(118,118,128,0.12)', borderRadius: 10, padding: 2, gap: 2 }}>
+              {(['email', 'message'] as const).map(p => (
+                <div key={p} onClick={() => setContactPref(p)} style={{
+                  flex: 1, textAlign: 'center', padding: '9px 0', borderRadius: 8, cursor: 'pointer',
+                  fontSize: 13, fontWeight: 600, transition: 'all 0.15s',
+                  background: contactPref === p ? '#fff' : 'transparent',
+                  color: contactPref === p ? '#1d1d1f' : '#86868b',
+                  boxShadow: contactPref === p ? '0 1px 3px rgba(0,0,0,0.12)' : 'none',
+                }}>
+                  {p === 'email' ? '✉ Email' : '💬 Direct message'}
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 12, color: '#86868b', marginTop: 6 }}>
+              {contactPref === 'email'
+                ? 'Your email address will be shared with interested buyers'
+                : 'Buyers contact you through PerfectPlane — your email stays private'}
+            </div>
+          </div>
+
+          {/* IFR certified */}
+          <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 12, background: 'rgba(118,118,128,0.06)', border: '0.5px solid rgba(0,0,0,0.06)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+              <span style={{ fontSize: 14, color: '#1d1d1f' }}>IFR Certified</span>
+              <div className={`pp-switch${ifr ? ' on' : ''}`} onClick={() => setIfr(v => !v)} style={{ flexShrink: 0 }}>
+                <div className="pp-switch-knob" />
+              </div>
+            </div>
+            <div style={{ fontSize: 12, color: '#86868b', marginTop: 4 }}>
+              Check if this aircraft has a valid IFR rating and up-to-date avionics
             </div>
           </div>
 

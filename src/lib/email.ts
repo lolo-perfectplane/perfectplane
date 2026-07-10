@@ -116,15 +116,21 @@ export async function sendJobApplication(application: {
 
 export async function sendBuyerInquiry(inquiry: {
   listingModel: string; listingYear: number; listingReg: string; listingPrice: number
+  sellerEmail?: string | null; sellerName?: string | null
   buyerName: string; buyerEmail: string; buyerPhone?: string; message?: string
 }) {
+  // Send to the seller's contact email (what "Contact seller" promises the buyer).
+  // Fall back to admin only if the listing somehow has no contact email on file,
+  // so the inquiry is never silently dropped.
+  const to = inquiry.sellerEmail || ADMIN
   await resend.emails.send({
     from: FROM,
-    to: ADMIN,
+    to,
     replyTo: safeEmail(inquiry.buyerEmail),
     subject: `[PerfectPlane] Buyer inquiry: ${inquiry.listingYear} ${esc(inquiry.listingModel)} (${esc(inquiry.listingReg)})`,
     html: `
-      <h2>A buyer is interested in this listing</h2>
+      <h2>A buyer is interested in your listing</h2>
+      ${inquiry.sellerName ? `<p>Hi ${esc(inquiry.sellerName)},</p>` : ''}
       <h3>Aircraft</h3>
       <ul>
         <li>${esc(String(inquiry.listingYear))} ${esc(inquiry.listingModel)}</li>

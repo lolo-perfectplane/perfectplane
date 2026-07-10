@@ -1,8 +1,9 @@
 'use client'
 // src/components/mobile/MobileFiltersDrawer.tsx
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import type { Params } from '@/components/AppShell'
 import type { APEntry } from '@/lib/airports'
+import { findStopovers, calcLegs } from '@/lib/airports'
 import { useSwipeToClose } from './useSwipeToClose'
 
 type Props = {
@@ -15,6 +16,7 @@ type Props = {
   onFind: () => void
   homeAp: { icao: string; name?: string } | null
   selAC?: { name: string; type: string; range: number; tas: number } | null
+  onRouteWaypoints?: (wps: { lat: number; lon: number; icao: string }[] | null) => void
 }
 
 function SliderRow({ label, min, max, value, step, fmt, onChange, mode, onModeChange, log }: {
@@ -72,14 +74,23 @@ function SliderRow({ label, min, max, value, step, fmt, onChange, mode, onModeCh
   )
 }
 
-export default function MobileFiltersDrawer({ open, onClose, params, onChange, onHomeAP, onRoutCalc, onFind, homeAp, selAC }: Props) {
+export default function MobileFiltersDrawer({ open, onClose, params, onChange, onHomeAP, onRoutCalc, onFind, homeAp, selAC, onRouteWaypoints }: Props) {
   const [apVal, setApVal]       = useState('')
   const [apName, setApName]     = useState('')
   const [rtA, setRtA]           = useState('')
   const [rtB, setRtB]           = useState('')
   const [routeRes, setRouteRes] = useState<{ nm: number; km: number } | null>(null)
   const [routeErr, setRouteErr] = useState('')
+  const [stops, setStops]       = useState<0 | 1 | 2 | 3>(0)
+  const [fromAp, setFromAp]     = useState<APEntry | null>(null)
+  const [toAp, setToAp]         = useState<APEntry | null>(null)
+  const [clickedStopover, setClickedStopover] = useState<string | null>(null)
   const { dragY, handlers } = useSwipeToClose(onClose)
+
+  // Mirror the home airport (set from the map overlay input) into the route's "From" field
+  useEffect(() => {
+    if (homeAp) setRtA(homeAp.icao)
+  }, [homeAp])
 
   const fmtM   = (v: number) => v >= 1000 ? `$${(v/1000).toFixed(1)}M` : `$${v}K`
   const fmtYr  = (v: number) => v >= 1000 ? `$${(v/1000).toFixed(1)}M/yr` : v >= 1 ? `$${v}K/yr` : `$${Math.round(v*1000)}/yr`
@@ -104,6 +115,11 @@ export default function MobileFiltersDrawer({ open, onClose, params, onChange, o
       Math.cos(res.from.lat*P)*Math.cos(res.to.lat*P)*Math.cos((res.to.lon-res.from.lon)*P)
     )))*180/Math.PI*60)
     setRouteRes({ nm, km: Math.round(nm * 1.852) })
+    setFromAp(res.from)
+    setToAp(res.to)
+    setClickedStopover(null)
+    setStops(0)
+    onRouteWaypoints?.(null)
     onChange({ ...params, range: Math.min(7500, Math.max(100, nm)) })
   }
 
@@ -111,6 +127,25 @@ export default function MobileFiltersDrawer({ open, onClose, params, onChange, o
     const h = Math.floor(nm / kt)
     const m = String(Math.round(((nm / kt) % 1) * 60)).padStart(2, '0')
     return `${h}h${m}`
+  }
+
+  const handleStops = (s: 0 | 1 | 2 | 3) => {
+    setStops(s)
+    setClickedStopover(null)
+    if (!routeRes) return
+    if (s === 0) {
+      onRouteWaypoints?.(null)
+      onChange({ ...params, range: Math.min(7500, Math.max(100, routeRes.nm)) })
+      return
+    }
+    if (!fromAp || !toAp) return
+    const stopovers = findStopovers(fromAp, toAp, s)
+    const legs = calcLegs(fromAp, stopovers, toAp)
+    if (legs.length === 0) return
+    const longestLeg = Math.max(...legs.map(l => l.dist))
+    const waypoints = [fromAp, ...stopovers, toAp]
+    onRouteWaypoints?.(waypoints.map(w => ({ lat: w.lat, lon: w.lon, icao: w.icao })))
+    onChange({ ...params, range: longestLeg })
   }
 
   const handleFind = () => { onFind(); onClose() }
@@ -184,26 +219,96 @@ export default function MobileFiltersDrawer({ open, onClose, params, onChange, o
               </div>
               {routeRes && (
                 <div style={{ marginTop: 12, padding: 14, background: 'rgba(118,118,128,0.07)', borderRadius: 14 }}>
-                  <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1 }}>
-                    {routeRes.nm.toLocaleString()}
-                    <span style={{ fontSize: 12, fontWeight: 500, color: '#86868b', marginLeft: 4 }}>nm · {routeRes.km.toLocaleString()} km</span>
+                  {/* Header row: FROM icao ── TO icao */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.02em' }}>{fromAp?.icao}</span>
+                    <div style={{ flex: 1, height: 1, background: 'rgba(0,0,0,0.12)' }} />
+                    <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.02em' }}>{toAp?.icao}</span>
                   </div>
+                  <div style={{ fontSize: 12, color: '#86868b', marginTop: 4 }}>
+                    Total: {routeRes.nm.toLocaleString()} nm · {routeRes.km.toLocaleString()} km
+                  </div>
+
+                  {/* Stops segmented control */}
+                  <div style={{ display: 'flex', background: 'rgba(118,118,128,0.12)', borderRadius: 10, padding: 2, gap: 2, marginTop: 10 }}>
+                    {([0, 1, 2, 3] as const).map(s => (
+                      <div key={s}
+                        onClick={() => handleStops(s)}
+                        style={{
+                          flex: 1, textAlign: 'center', fontSize: 11, fontWeight: 500,
+                          padding: '7px 0', borderRadius: 8, cursor: 'pointer',
+                          background: stops === s ? '#fff' : 'transparent',
+                          color: stops === s ? '#1d1d1f' : '#86868b',
+                          boxShadow: stops === s ? '0 1px 3px rgba(0,0,0,0.12)' : 'none',
+                          transition: 'all 0.15s',
+                        }}
+                      >{s === 0 ? 'Direct' : s === 1 ? '1 Stop' : `${s} Stops`}</div>
+                    ))}
+                  </div>
+
                   <div style={{ height: '0.5px', background: 'rgba(0,0,0,0.08)', margin: '10px 0' }} />
-                  {selAC ? (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                      <span style={{ color: '#86868b' }}>{selAC.name}</span>
-                      <span style={{ fontWeight: 600 }}>{formatTime(routeRes.nm, selAC.tas)}</span>
-                    </div>
-                  ) : (
-                    <>
-                      {[['Jet (450 kt)', 450], ['Turboprop (280 kt)', 280], ['Piston (130 kt)', 130]].map(([lbl, kt]) => (
-                        <div key={String(kt)} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
-                          <span style={{ color: '#86868b' }}>{lbl}</span>
-                          <span style={{ fontWeight: 600 }}>{formatTime(routeRes.nm, Number(kt))}</span>
+
+                  {stops === 0 ? (
+                    selAC ? (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                        <span style={{ color: '#86868b' }}>{selAC.name}</span>
+                        <span style={{ fontWeight: 600 }}>{formatTime(routeRes.nm, selAC.tas)}</span>
+                      </div>
+                    ) : (
+                      <>
+                        {[['Jet (450 kt)', 450], ['Turboprop (280 kt)', 280], ['Piston (130 kt)', 130]].map(([lbl, kt]) => (
+                          <div key={String(kt)} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
+                            <span style={{ color: '#86868b' }}>{lbl}</span>
+                            <span style={{ fontWeight: 600 }}>{formatTime(routeRes.nm, Number(kt))}</span>
+                          </div>
+                        ))}
+                      </>
+                    )
+                  ) : fromAp && toAp ? (() => {
+                    const stopovers  = findStopovers(fromAp, toAp, stops)
+                    const legs       = calcLegs(fromAp, stopovers, toAp)
+                    const waypoints  = [fromAp, ...stopovers, toAp]
+                    const longestLeg = legs.length ? Math.max(...legs.map(l => l.dist)) : 0
+                    return (
+                      <>
+                        <div>
+                          {waypoints.map((wp, idx) => {
+                            const isEndpoint = idx === 0 || idx === waypoints.length - 1
+                            const leg = idx < waypoints.length - 1 ? legs[idx] : null
+                            return (
+                              <div key={`${wp.icao}-${idx}`}>
+                                <div
+                                  onClick={() => !isEndpoint && setClickedStopover(v => v === wp.icao ? null : wp.icao)}
+                                  style={{ display: 'flex', alignItems: 'center', cursor: isEndpoint ? 'default' : 'pointer' }}
+                                >
+                                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: isEndpoint ? '#0a84ff' : '#ff9f0a', flexShrink: 0 }} />
+                                  <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.02em', marginLeft: 8 }}>{wp.icao}</span>
+                                  <span style={{ fontSize: 12, color: '#86868b', marginLeft: 4 }}>{wp.name}</span>
+                                </div>
+                                {!isEndpoint && clickedStopover === wp.icao && (
+                                  <div style={{ fontSize: 11, color: '#0a84ff', marginLeft: 22, marginTop: 2 }}>Airport set as waypoint</div>
+                                )}
+                                {leg && (
+                                  <div style={{ display: 'flex', alignItems: 'center', minHeight: 22 }}>
+                                    <div style={{ width: 2, alignSelf: 'stretch', background: 'rgba(0,0,0,0.08)', marginLeft: 6 }} />
+                                    <span style={{ fontSize: 12, color: '#0a84ff', fontWeight: 600, marginLeft: 14 }}>{leg.dist.toLocaleString()} nm</span>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
                         </div>
-                      ))}
-                    </>
-                  )}
+                        <div style={{ marginTop: 8, fontSize: 12, color: '#86868b' }}>
+                          Longest leg: <b style={{ color: '#1d1d1f' }}>{longestLeg.toLocaleString()} nm</b>
+                          {' · '}
+                          <span
+                            onClick={() => onChange({ ...params, range: longestLeg })}
+                            style={{ color: '#0a84ff', fontWeight: 600, cursor: 'pointer' }}
+                          >Set as range</span>
+                        </div>
+                      </>
+                    )
+                  })() : null}
                 </div>
               )}
               {routeErr && <div style={{ fontSize: 13, color: '#ff3b30', marginTop: 6 }}>{routeErr}</div>}

@@ -20,10 +20,10 @@ export async function POST(req: NextRequest) {
 
     const supabase = createServerClient()
 
-    // Fetch the listing to get aircraft details
+    // Fetch the listing to get aircraft details + the seller's contact email
     const { data: listing, error: le } = await supabase
       .from('listings')
-      .select('model, year, reg, price')
+      .select('model, year, reg, price, contact_email, seller_name')
       .eq('id', listingId)
       .eq('status', 'approved')
       .single()
@@ -39,10 +39,11 @@ export async function POST(req: NextRequest) {
       message: message || null,
     })
 
-    // Send email to admin
+    // Send email to the seller (not the admin) — this is what "Contact seller" promises
     await sendBuyerInquiry({
       listingModel: listing.model, listingYear: listing.year,
       listingReg: listing.reg, listingPrice: listing.price,
+      sellerEmail: listing.contact_email, sellerName: listing.seller_name,
       buyerName, buyerEmail, buyerPhone, message,
     })
 

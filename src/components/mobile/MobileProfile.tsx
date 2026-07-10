@@ -11,9 +11,11 @@ type Props = {
   onMyItemsClick: () => void
   onAdminClick: () => void
   onSignOut: () => void
+  onMessagesClick?: () => void
+  unreadCount?: number
 }
 
-export default function MobileProfile({ user, onAuthClick, onMyItemsClick, onAdminClick, onSignOut }: Props) {
+export default function MobileProfile({ user, onAuthClick, onMyItemsClick, onAdminClick, onSignOut, onMessagesClick, unreadCount = 0 }: Props) {
   const [legalDoc, setLegalDoc] = useState<'tos' | 'privacy' | null>(null)
 
   if (!user) {
@@ -71,6 +73,19 @@ export default function MobileProfile({ user, onAuthClick, onMyItemsClick, onAdm
 
       {/* Actions */}
       <div style={{ margin: '0 16px', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        {onMessagesClick && (
+          <div style={row} onClick={onMessagesClick}>
+            <span style={{ fontSize: 15, color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: 8 }}>
+              💬 Messages
+              {unreadCount > 0 && (
+                <span style={{ minWidth: 18, height: 18, borderRadius: 9, background: '#ff3b30', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </span>
+            <span style={{ color: '#86868b', fontSize: 16 }}>›</span>
+          </div>
+        )}
         <div style={row} onClick={onMyItemsClick}>
           <span style={{ fontSize: 15, color: '#1d1d1f' }}>📋 My listings & jobs</span>
           <span style={{ color: '#86868b', fontSize: 16 }}>›</span>

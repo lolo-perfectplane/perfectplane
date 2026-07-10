@@ -4,9 +4,9 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
 
 type User = { id: string; name: string; email: string; role: string }
-type Props = { onClose: () => void; onLogin: (u: User) => void }
+type Props = { onClose: () => void; onLogin: (u: User) => void; message?: string }
 
-export default function AuthModal({ onClose, onLogin }: Props) {
+export default function AuthModal({ onClose, onLogin, message }: Props) {
   const [mode, setMode]     = useState<'signin' | 'signup'>('signin')
   const [email, setEmail]   = useState('')
   const [pass, setPass]     = useState('')
@@ -78,7 +78,7 @@ export default function AuthModal({ onClose, onLogin }: Props) {
           {mode === 'signin' ? 'Sign in' : 'Create account'}
         </div>
         <div style={{ fontSize: 13, color: '#86868b', marginBottom: 22 }}>
-          {mode === 'signin' ? 'Welcome back to PerfectPlane' : 'Join PerfectPlane to list and manage aircraft'}
+          {message ?? (mode === 'signin' ? 'Welcome back to PerfectPlane' : 'Join PerfectPlane to list and manage aircraft')}
         </div>
 
         {mode === 'signup' && (

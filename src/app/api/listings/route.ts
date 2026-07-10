@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const {
       model, year, reg, hours, price, location,
-      equip, condition, contactEmail, sellerId, sellerName, photos,
+      equip, condition, ifr, contact_pref, contactEmail, sellerId, sellerName, photos,
       certificationRequested, engineTimes, propTimes, description,
       airframeNotes, engineNotes,
     } = body
@@ -30,6 +30,8 @@ export async function POST(req: NextRequest) {
         model, year: +year, reg: reg.toUpperCase(),
         hours: +hours, price: +price, location,
         equip: equip || null, condition: condition || 'Good',
+        ifr: ifr ?? false,
+        contact_pref: contact_pref ?? 'email',
         type_rating: false,
         contact_email: contactEmail,
         seller_id: sellerId,
@@ -70,10 +72,12 @@ export async function GET(req: NextRequest) {
   const model = searchParams.get('model')
 
   const supabase = createServerClient()
-  // Exclude PII fields (contact_email, seller_id) from public listing results
+  // Exclude PII fields (contact_email) from public listing results.
+  // seller_id is included — it's an opaque UUID needed to route in-app
+  // messages to the seller when contact_pref is 'message'.
   let query = supabase
     .from('listings')
-    .select('id,model,year,reg,hours,price,location,equip,condition,type_rating,photos,approved_at,seller_name,certified,certification_requested,engine_times,prop_times,description,airframe_notes,engine_notes')
+    .select('id,model,year,reg,hours,price,location,equip,condition,ifr,contact_pref,seller_id,type_rating,photos,approved_at,seller_name,certified,certification_requested,engine_times,prop_times,description,airframe_notes,engine_notes')
     .eq('status', 'approved')
   if (model) query = query.eq('model', model)
 
