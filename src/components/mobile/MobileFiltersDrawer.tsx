@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import type { Params } from '@/components/AppShell'
 import type { APEntry } from '@/lib/airports'
-import { findStopovers, calcLegs } from '@/lib/airports'
+import { findStopovers, calcLegs, servesAircraft } from '@/lib/airports'
 import { useSwipeToClose } from './useSwipeToClose'
 
 type Props = {
@@ -139,7 +139,7 @@ export default function MobileFiltersDrawer({ open, onClose, params, onChange, o
       return
     }
     if (!fromAp || !toAp) return
-    const stopovers = findStopovers(fromAp, toAp, s)
+    const stopovers = findStopovers(fromAp, toAp, s, selAC?.type)
     const legs = calcLegs(fromAp, stopovers, toAp)
     if (legs.length === 0) return
     const longestLeg = Math.max(...legs.map(l => l.dist))
@@ -265,7 +265,7 @@ export default function MobileFiltersDrawer({ open, onClose, params, onChange, o
                       </>
                     )
                   ) : fromAp && toAp ? (() => {
-                    const stopovers  = findStopovers(fromAp, toAp, stops)
+                    const stopovers  = findStopovers(fromAp, toAp, stops, selAC?.type)
                     const legs       = calcLegs(fromAp, stopovers, toAp)
                     const waypoints  = [fromAp, ...stopovers, toAp]
                     const longestLeg = legs.length ? Math.max(...legs.map(l => l.dist)) : 0
@@ -275,6 +275,7 @@ export default function MobileFiltersDrawer({ open, onClose, params, onChange, o
                           {waypoints.map((wp, idx) => {
                             const isEndpoint = idx === 0 || idx === waypoints.length - 1
                             const leg = idx < waypoints.length - 1 ? legs[idx] : null
+                            const underserved = !isEndpoint && selAC && !servesAircraft(wp, selAC.type)
                             return (
                               <div key={`${wp.icao}-${idx}`}>
                                 <div
@@ -284,9 +285,14 @@ export default function MobileFiltersDrawer({ open, onClose, params, onChange, o
                                   <span style={{ width: 10, height: 10, borderRadius: '50%', background: isEndpoint ? '#0a84ff' : '#ff9f0a', flexShrink: 0 }} />
                                   <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.02em', marginLeft: 8 }}>{wp.icao}</span>
                                   <span style={{ fontSize: 12, color: '#86868b', marginLeft: 4 }}>{wp.name}</span>
+                                  {underserved && (
+                                    <span title={`May not fully support a ${selAC?.type} (fuel/runway)`} style={{ fontSize: 11, color: '#ff9f0a', marginLeft: 6 }}>⚠</span>
+                                  )}
                                 </div>
                                 {!isEndpoint && clickedStopover === wp.icao && (
-                                  <div style={{ fontSize: 11, color: '#0a84ff', marginLeft: 22, marginTop: 2 }}>Airport set as waypoint</div>
+                                  <div style={{ fontSize: 11, color: '#0a84ff', marginLeft: 22, marginTop: 2 }}>
+                                    {underserved ? 'May not fully support this aircraft type' : 'Airport set as waypoint'}
+                                  </div>
                                 )}
                                 {leg && (
                                   <div style={{ display: 'flex', alignItems: 'center', minHeight: 22 }}>

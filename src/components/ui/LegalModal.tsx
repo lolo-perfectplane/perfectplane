@@ -179,9 +179,12 @@ You also have the right to lodge a complaint with your national data protection 
 
 ## 8. Cookies
 
-PerfectPlane uses only **essential cookies** required for authentication and session management (via Supabase Auth). We do not use advertising cookies, tracking pixels, or third-party analytics cookies.
+PerfectPlane uses two categories of cookies:
 
-No cookie consent banner is currently required as we only use strictly necessary cookies.
+- **Essential cookies** — required for authentication and session management (via Supabase Auth). These are always active and cannot be disabled, as the app cannot function without them.
+- **Analytics cookies** — via Google Tag Manager and Google Analytics, used to understand how the app is used and to improve it (page views, feature usage). We do not use advertising cookies or third-party ad tracking.
+
+Analytics cookies are only loaded after you give consent, which we ask for at the end of the onboarding tour. You can accept or decline at that point, and your choice is remembered on this device. Declining does not affect access to any feature of the app.
 
 ## 9. Data Security
 

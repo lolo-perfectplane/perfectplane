@@ -1,16 +1,19 @@
 'use client'
 // src/components/ui/WelcomeModal.tsx
 import { useState } from 'react'
+import { COOKIE_CONSENT_KEY, COOKIE_CONSENT_EVENT } from './CookieConsentLoader'
 
-type Phase = 'welcome' | 'tour'
+type Phase = 'welcome' | 'tour' | 'cookies'
 
 type Step = { icon: string; title: string; body: string }
 
 const STEPS: Step[] = [
   { icon: '🏠', title: 'Set your home airport', body: 'Type any ICAO or IATA code (e.g. LFPG, JFK, EGLL) to anchor your range rings on the globe.' },
-  { icon: '🎚', title: 'Configure your mission', body: 'Set your budget, fixed costs, variable cost per hour, passengers and desired range. The app will find every aircraft that fits.' },
+  { icon: '🎚', title: 'Configure your mission', body: 'Set your budget or, in simple mode, just your hours flown per year and total budget — the app splits fixed and hourly costs for you. Passengers and desired range round out the search.' },
+  { icon: '🧭', title: 'Plan a multi-stop route', body: 'Add stopovers to your route — PerfectPlane computes the legs automatically and draws the full route on the globe, with your stopovers and destination marked.' },
   { icon: '✦', title: 'Find my aircraft', body: 'Hit this button to run the matching algorithm across 488 aircraft. Results are scored and ranked instantly.' },
   { icon: '🛩', title: 'Your matches', body: "Each card shows range, speed, capacity and a match score. Click an aircraft to see its range ring on the globe. Click 'See offers' to browse listings." },
+  { icon: '⚖', title: 'Compare aircraft', body: 'In the Market tab, tap "Compare" on up to 3 listings to see them side by side — price, performance, condition and more, with the best value highlighted.' },
   { icon: '💨', title: 'Live HUD', body: 'The HUD at the bottom shows your position, selected aircraft and range. Toggle winds ON to see jet-stream adjusted range rings in real time.' },
   { icon: '🛒', title: 'Market & Fleet', body: 'Switch to Market to browse or list aircraft for free. Fleet tab lets you track your own aircraft, costs and maintenance.' },
 ]
@@ -96,7 +99,7 @@ export default function WelcomeModal({ onClose }: { onClose: () => void }) {
             </button>
 
             <button
-              onClick={onClose}
+              onClick={() => setPhase('cookies')}
               style={{
                 width: '100%', marginTop: 12, padding: '8px 0',
                 background: 'none', border: 'none', cursor: 'pointer',
@@ -111,10 +114,66 @@ export default function WelcomeModal({ onClose }: { onClose: () => void }) {
     )
   }
 
+  const setConsent = (granted: boolean) => {
+    localStorage.setItem(COOKIE_CONSENT_KEY, granted ? 'granted' : 'denied')
+    if (granted) window.dispatchEvent(new Event(COOKIE_CONSENT_EVENT))
+    onClose()
+  }
+
+  if (phase === 'cookies') {
+    return (
+      <div style={overlay}>
+        <div style={{ ...CARD_STYLE, width: 'min(400px, 92vw)', padding: '28px 26px 26px' }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 12,
+            background: 'rgba(10,132,255,0.12)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 22, marginBottom: 16,
+          }}>
+            🍪
+          </div>
+          <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: '-0.02em', color: '#1d1d1f', marginBottom: 8 }}>
+            Before you go
+          </div>
+          <div style={{ fontSize: 14, color: '#4b5563', lineHeight: 1.65, marginBottom: 24 }}>
+            We'd like to use analytics cookies to understand how PerfectPlane is used and improve it. No advertising or third-party tracking — you can change your mind anytime in Settings.
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              onClick={() => setConsent(false)}
+              style={{
+                height: 46, padding: '0 18px', borderRadius: 12,
+                border: '1px solid rgba(0,0,0,0.12)', background: 'transparent',
+                color: '#1d1d1f', fontSize: 14, fontWeight: 600, fontFamily: 'inherit',
+                cursor: 'pointer', transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.04)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              Decline
+            </button>
+            <button
+              onClick={() => setConsent(true)}
+              style={{
+                flex: 1, height: 46, borderRadius: 12, border: 'none',
+                background: '#0a84ff', color: '#fff', fontSize: 14, fontWeight: 600,
+                fontFamily: 'inherit', cursor: 'pointer', transition: 'filter 0.15s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.08)')}
+              onMouseLeave={e => (e.currentTarget.style.filter = 'none')}
+            >
+              Accept cookies
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // ── Tour phase ──────────────────────────────────────────────
   const s        = STEPS[step]
   const isLast   = step === STEPS.length - 1
-  const goNext   = () => (isLast ? onClose() : setStep(v => v + 1))
+  const goNext   = () => (isLast ? setPhase('cookies') : setStep(v => v + 1))
   const goBack   = () => setStep(v => Math.max(0, v - 1))
 
   return (
@@ -134,7 +193,7 @@ export default function WelcomeModal({ onClose }: { onClose: () => void }) {
             ))}
           </div>
           <button
-            onClick={onClose}
+            onClick={() => setPhase('cookies')}
             style={{
               width: 26, height: 26, borderRadius: '50%', border: 'none',
               background: 'rgba(118,118,128,0.12)', color: '#86868b',
