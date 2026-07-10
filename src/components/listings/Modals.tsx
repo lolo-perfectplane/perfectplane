@@ -82,6 +82,7 @@ export function SellModal({ user, onClose, onSuccess }: SellProps) {
   const [loading,         setLoading]         = useState(false)
   const [engineTimes,     setEngineTimes]     = useState(['', '', '', ''])
   const [propTimes,       setPropTimes]       = useState(['', '', '', ''])
+  const [timeBasis,       setTimeBasis]       = useState<'since_check' | 'to_next_check'>('since_check')
   const [description,     setDescription]     = useState('')
   const [airframeNotes,   setAirframeNotes]   = useState('')
   const [engineNotes,     setEngineNotes]     = useState('')
@@ -128,6 +129,7 @@ export function SellModal({ user, onClose, onSuccess }: SellProps) {
           certificationRequested: certReq,
           engineTimes: engineTimes.slice(0, engineCount).map(t => t ? +t : null),
           propTimes: hasProp ? propTimes.slice(0, engineCount).map(t => t ? +t : null) : null,
+          timeBasis,
           description:    showDesc        ? description    : null,
           airframeNotes:  showAirframe    ? airframeNotes  : null,
           engineNotes:    showEngineNotes ? engineNotes    : null,
@@ -150,12 +152,13 @@ export function SellModal({ user, onClose, onSuccess }: SellProps) {
   }
 
   const cols = Math.min(engineCount, 2)
+  const timeSuffix = timeBasis === 'since_check' ? '(hrs since check)' : '(hrs to next check)'
   const engineLabels = engineCount === 1
-    ? ['Engine Time (hrs)']
-    : Array.from({ length: engineCount }, (_, i) => `Engine ${i + 1} Time (hrs)`)
+    ? [`Engine Time ${timeSuffix}`]
+    : Array.from({ length: engineCount }, (_, i) => `Engine ${i + 1} Time ${timeSuffix}`)
   const propLabels = engineCount === 1
-    ? ['Prop Time (hrs)']
-    : Array.from({ length: engineCount }, (_, i) => `Prop ${i + 1} Time (hrs)`)
+    ? [`Prop Time ${timeSuffix}`]
+    : Array.from({ length: engineCount }, (_, i) => `Prop ${i + 1} Time ${timeSuffix}`)
 
   return (
     <div style={overlay} onClick={e => e.target === e.currentTarget && onClose()}>
@@ -229,6 +232,27 @@ export function SellModal({ user, onClose, onSuccess }: SellProps) {
             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
               <label style={lbl}>Asking price (USD)</label>
               <input style={inp} type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="450000" />
+            </div>
+          </div>
+
+          {/* Engine/prop time basis */}
+          <div style={{ marginBottom: 10 }}>
+            <label style={lbl}>Engine &amp; prop time entered as</label>
+            <div style={{ display: 'flex', background: 'rgba(118,118,128,0.12)', borderRadius: 10, padding: 2, gap: 2 }}>
+              {([
+                ['since_check', 'Time since last check'],
+                ['to_next_check', 'Remaining to next check'],
+              ] as const).map(([val, label]) => (
+                <div key={val} onClick={() => setTimeBasis(val)} style={{
+                  flex: 1, textAlign: 'center', padding: '9px 4px', borderRadius: 8, cursor: 'pointer',
+                  fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
+                  background: timeBasis === val ? '#fff' : 'transparent',
+                  color: timeBasis === val ? '#1d1d1f' : '#86868b',
+                  boxShadow: timeBasis === val ? '0 1px 3px rgba(0,0,0,0.12)' : 'none',
+                }}>
+                  {label}
+                </div>
+              ))}
             </div>
           </div>
 
@@ -819,7 +843,7 @@ export function AdminModal({ userId, onClose, onApproved }: AdminProps) {
           {isEditing && (
             <div style={{ background: 'rgba(10,132,255,0.04)', borderRadius: 10, padding: 12, marginBottom: 10 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                {[['Year', 'year', 'number'], ['Reg', 'reg', 'text'], ['Hours TT', 'hours', 'number'], ['Price (USD)', 'price', 'number']].map(([lbl, k, type]) => (
+                {[['Year', 'year', 'number'], ['Reg', 'reg', 'text'], ['Hours TT', 'hours', 'number'], ['Price (USD)', 'price', 'number'], ['Location', 'location', 'text']].map(([lbl, k, type]) => (
                   <div key={k}>
                     <label style={editLbl}>{lbl}</label>
                     <input style={editInp} type={type} value={editData[k] ?? ''} onChange={e => setEditData((d: any) => ({ ...d, [k]: e.target.value }))} />
@@ -840,11 +864,34 @@ export function AdminModal({ userId, onClose, onApproved }: AdminProps) {
                 <label style={editLbl}>Equipment</label>
                 <input style={editInp} value={editData.equip ?? ''} onChange={e => setEditData((d: any) => ({ ...d, equip: e.target.value }))} />
               </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, cursor: 'pointer' }}>
-                <input type="checkbox" checked={!!editData.certified} onChange={e => setEditData((d: any) => ({ ...d, certified: e.target.checked }))}
-                  style={{ width: 15, height: 15, accentColor: '#f5a623' }} />
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#b07800' }}>⭐ Certified</span>
-              </label>
+              <div style={{ display: 'flex', gap: 16, marginBottom: 10 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={!!editData.certified} onChange={e => setEditData((d: any) => ({ ...d, certified: e.target.checked }))}
+                    style={{ width: 15, height: 15, accentColor: '#f5a623' }} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#b07800' }}>⭐ Certified</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={!!editData.ifr} onChange={e => setEditData((d: any) => ({ ...d, ifr: e.target.checked }))}
+                    style={{ width: 15, height: 15, accentColor: '#0a84ff' }} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#0a84ff' }}>IFR Certified</span>
+                </label>
+              </div>
+              {(editData.photos ?? []).length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <label style={editLbl}>Photos — click ✕ to remove</label>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {(editData.photos as string[]).map((p, i) => (
+                      <div key={p + i} style={{ position: 'relative', width: 64, height: 64, borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
+                        <img src={p} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        <button
+                          onClick={() => setEditData((d: any) => ({ ...d, photos: (d.photos as string[]).filter((_, j) => j !== i) }))}
+                          style={{ position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.65)', color: '#fff', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >✕</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={() => saveEdit(l.id, 'listing')} style={{ ...iBtn('#fff', '#0a84ff'), flex: 1, height: 36 }}>Save changes</button>
                 <button onClick={() => { setEditId(null); setEditData({}) }} style={{ ...iBtn('#86868b', 'rgba(118,118,128,0.1)'), flex: 1, height: 36 }}>Cancel</button>
@@ -905,11 +952,12 @@ export function AdminModal({ userId, onClose, onApproved }: AdminProps) {
             {(() => {
               const engineTimes: (number | null)[] = viewListing.engine_times ?? []
               const propTimes:   (number | null)[] = viewListing.prop_times   ?? []
+              const timeSuffix = viewListing.time_basis === 'to_next_check' ? ' h to next check' : ' h since check'
               const rows: [string,string][] = [
                 viewListing.condition   && ['Condition',  viewListing.condition],
                 viewListing.seller_name && ['Seller',     viewListing.seller_name],
-                ...engineTimes.map((t,i) => t != null ? [`Eng ${engineTimes.length>1?i+1:''} Time`, `${t.toLocaleString()} h`] as [string,string] : null),
-                ...propTimes.map(  (t,i) => t != null ? [`Prop ${propTimes.length>1?i+1:''} Time`,  `${t.toLocaleString()} h`] as [string,string] : null),
+                ...engineTimes.map((t,i) => t != null ? [`Eng ${engineTimes.length>1?i+1:''} Time`, `${t.toLocaleString()}${timeSuffix}`] as [string,string] : null),
+                ...propTimes.map(  (t,i) => t != null ? [`Prop ${propTimes.length>1?i+1:''} Time`,  `${t.toLocaleString()}${timeSuffix}`] as [string,string] : null),
               ].filter(Boolean) as [string,string][]
               return rows.length > 0 ? (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>

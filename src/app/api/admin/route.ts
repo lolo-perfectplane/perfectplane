@@ -80,6 +80,8 @@ export async function PATCH(req: NextRequest) {
         type_rating:   !!edits.type_rating,
         contact_email: edits.contact_email,
         certified:     !!edits.certified,
+        ifr:           !!edits.ifr,
+        ...(Array.isArray(edits.photos) && { photos: edits.photos }),
       }).eq('id', listingId)
       if (error) throw error
       return NextResponse.json({ ok: true })

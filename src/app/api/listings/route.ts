@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     const {
       model, year, reg, hours, price, location,
       equip, condition, ifr, contact_pref, contactEmail, sellerId, sellerName, photos,
-      certificationRequested, engineTimes, propTimes, description,
+      certificationRequested, engineTimes, propTimes, timeBasis, description,
       airframeNotes, engineNotes,
     } = body
 
@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
         certification_requested: !!certificationRequested,
         engine_times: engineTimes?.some((t: any) => t != null) ? engineTimes : null,
         prop_times:   propTimes?.some((t: any) => t != null)   ? propTimes   : null,
+        time_basis:   timeBasis === 'to_next_check' ? 'to_next_check' : 'since_check',
         description:    description    || null,
         airframe_notes: airframeNotes  || null,
         engine_notes:   engineNotes    || null,
@@ -77,7 +78,7 @@ export async function GET(req: NextRequest) {
   // messages to the seller when contact_pref is 'message'.
   let query = supabase
     .from('listings')
-    .select('id,model,year,reg,hours,price,location,equip,condition,ifr,contact_pref,seller_id,type_rating,photos,approved_at,seller_name,certified,certification_requested,engine_times,prop_times,description,airframe_notes,engine_notes')
+    .select('id,model,year,reg,hours,price,location,equip,condition,ifr,contact_pref,seller_id,type_rating,photos,approved_at,seller_name,certified,certification_requested,engine_times,prop_times,time_basis,description,airframe_notes,engine_notes')
     .eq('status', 'approved')
   if (model) query = query.eq('model', model)
 

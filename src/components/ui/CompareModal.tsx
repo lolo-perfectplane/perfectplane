@@ -108,7 +108,7 @@ export default function CompareModal({ listings, onClose, onRemove, onViewListin
           <div style={{ display: 'flex', minWidth: 140 + listings.length * colWidth }}>
             {/* Row-label column */}
             <div style={{ width: 140, flexShrink: 0 }}>
-              <div style={{ height: 190 }} /> {/* spacer matching photo+title block */}
+              <div style={{ height: 208 }} /> {/* spacer matching photo+title block */}
               {rows.map(r => (
                 <div key={r.label} style={{ height: 40, display: 'flex', alignItems: 'center', fontSize: 11, fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.03em', borderTop: '0.5px solid rgba(0,0,0,0.06)' }}>
                   {r.label}
@@ -121,22 +121,24 @@ export default function CompareModal({ listings, onClose, onRemove, onViewListin
               const photos: string[] = l.photos ?? []
               return (
                 <div key={l.id} style={{ width: colWidth, flexShrink: 0, borderLeft: '0.5px solid rgba(0,0,0,0.06)' }}>
-                  {/* Photo + title block */}
-                  <div style={{ height: 190, padding: '0 10px 10px', display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '6px 0 4px' }}>
+                  {/* Photo + title block — kept compact (shorter photo, tighter
+                      remove-button row) so a 2-line model name never overlaps
+                      the Price row that follows immediately below. */}
+                  <div style={{ height: 208, padding: '0 10px 10px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '4px 0 3px' }}>
                       <button onClick={() => onRemove(l.id)} title="Remove from comparison" style={{
-                        width: 22, height: 22, borderRadius: '50%', border: 'none',
-                        background: 'rgba(118,118,128,0.12)', color: '#86868b', cursor: 'pointer', fontSize: 11,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        width: 20, height: 20, borderRadius: '50%', border: 'none',
+                        background: 'rgba(118,118,128,0.12)', color: '#86868b', cursor: 'pointer', fontSize: 10,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                       }}>✕</button>
                     </div>
-                    <div onClick={() => onViewListing(l.id)} style={{ cursor: 'pointer', borderRadius: 10, overflow: 'hidden', width: '100%', aspectRatio: '4/3', background: 'rgba(118,118,128,0.08)', flexShrink: 0 }}>
+                    <div onClick={() => onViewListing(l.id)} style={{ cursor: 'pointer', borderRadius: 10, overflow: 'hidden', width: '100%', aspectRatio: '16/10', background: 'rgba(118,118,128,0.08)', flexShrink: 0 }}>
                       {photos.length > 0
                         ? <img src={photos[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                         : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, color: 'rgba(0,0,0,0.15)' }}>✈</div>
                       }
                     </div>
-                    <div onClick={() => onViewListing(l.id)} style={{ cursor: 'pointer', fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em', marginTop: 6, lineHeight: 1.25 }}>
+                    <div onClick={() => onViewListing(l.id)} style={{ cursor: 'pointer', fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em', marginTop: 5, lineHeight: 1.25 }}>
                       {l.year} {l.model}
                     </div>
                   </div>

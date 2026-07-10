@@ -364,11 +364,12 @@ function ListingSheet({ listing, onClose, onContact, user, onAuthRequired, onOpe
     listing.seller_name && ['Seller',       listing.seller_name],
   ].filter(Boolean) as [string, string][]
 
+  const timeSuffix = (listing as any).time_basis === 'to_next_check' ? ' h to next check' : ' h since check'
   const engineRows = engineTimes
-    .map((t, i) => t != null ? [`Eng ${engineTimes.length > 1 ? i + 1 : ''} Time`, `${t.toLocaleString()} h`] : null)
+    .map((t, i) => t != null ? [`Eng ${engineTimes.length > 1 ? i + 1 : ''} Time`, `${t.toLocaleString()}${timeSuffix}`] : null)
     .filter(Boolean) as [string, string][]
   const propRows = propTimes
-    .map((t, i) => t != null ? [`Prop ${propTimes.length > 1 ? i + 1 : ''} Time`, `${t.toLocaleString()} h`] : null)
+    .map((t, i) => t != null ? [`Prop ${propTimes.length > 1 ? i + 1 : ''} Time`, `${t.toLocaleString()}${timeSuffix}`] : null)
     .filter(Boolean) as [string, string][]
 
   return (

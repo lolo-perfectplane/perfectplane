@@ -234,11 +234,12 @@ function ListingModal({ listing, onClose, onContact, user, onAuthRequired, onOpe
           {(() => {
             const engineTimes: (number | null)[] = (listing as any).engine_times ?? []
             const propTimes:   (number | null)[]  = (listing as any).prop_times   ?? []
+            const timeSuffix = (listing as any).time_basis === 'to_next_check' ? ' h to next check' : ' h since check'
             const rows: [string, string][] = [
               listing.condition   && ['Condition',  listing.condition],
               listing.seller_name && ['Seller',     listing.seller_name],
-              ...engineTimes.map((t, i) => t != null ? [`Eng ${engineTimes.length > 1 ? i + 1 : ''} Time`, `${t.toLocaleString()} h`] as [string,string] : null),
-              ...propTimes.map(  (t, i) => t != null ? [`Prop ${propTimes.length > 1 ? i + 1 : ''} Time`,  `${t.toLocaleString()} h`] as [string,string] : null),
+              ...engineTimes.map((t, i) => t != null ? [`Eng ${engineTimes.length > 1 ? i + 1 : ''} Time`, `${t.toLocaleString()}${timeSuffix}`] as [string,string] : null),
+              ...propTimes.map(  (t, i) => t != null ? [`Prop ${propTimes.length > 1 ? i + 1 : ''} Time`,  `${t.toLocaleString()}${timeSuffix}`] as [string,string] : null),
             ].filter(Boolean) as [string, string][]
             return rows.length > 0 ? (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>

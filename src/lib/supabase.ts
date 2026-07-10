@@ -43,6 +43,7 @@ export type Listing = {
   certified: boolean
   engine_times: (number | null)[] | null
   prop_times: (number | null)[] | null
+  time_basis: 'since_check' | 'to_next_check'
   description: string | null
   airframe_notes: string | null
   engine_notes: string | null
