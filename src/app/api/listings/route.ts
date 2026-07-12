@@ -1,8 +1,10 @@
 // src/app/api/listings/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
+import { getVerifiedUserId } from '@/lib/auth-server'
 import { sendListingSubmitted } from '@/lib/email'
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
+import { CURRENCIES } from '@/lib/currency'
 
 // POST /api/listings — submit a new listing (pending)
 export async function POST(req: NextRequest) {
@@ -13,13 +15,13 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const {
-      model, year, reg, hours, price, location,
+      model, year, reg, hours, price, currency, location, lat, lon,
       equip, condition, ifr, contact_pref, contactEmail, sellerId, sellerName, photos,
       certificationRequested, engineTimes, propTimes, timeBasis, description,
-      airframeNotes, engineNotes,
+      airframeNotes, engineNotes, interiorNotes, exteriorNotes, priceOnEnquiry,
     } = body
 
-    if (!model || !year || !reg || !hours || !price || !location || !sellerId) {
+    if (!model || !year || !reg || !hours || !location || !sellerId || (!price && !priceOnEnquiry)) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -28,7 +30,11 @@ export async function POST(req: NextRequest) {
       .from('listings')
       .insert({
         model, year: +year, reg: reg.toUpperCase(),
-        hours: +hours, price: +price, location,
+        hours: +hours, price: priceOnEnquiry ? null : +price, location,
+        currency: CURRENCIES.includes(currency) ? currency : 'USD',
+        lat: typeof lat === 'number' ? lat : null,
+        lon: typeof lon === 'number' ? lon : null,
+        price_on_enquiry: !!priceOnEnquiry,
         equip: equip || null, condition: condition || 'Good',
         ifr: ifr ?? false,
         contact_pref: contact_pref ?? 'email',
@@ -44,6 +50,8 @@ export async function POST(req: NextRequest) {
         description:    description    || null,
         airframe_notes: airframeNotes  || null,
         engine_notes:   engineNotes    || null,
+        interior_notes: interiorNotes  || null,
+        exterior_notes: exteriorNotes  || null,
         status: 'pending',
       })
       .select()
@@ -53,7 +61,7 @@ export async function POST(req: NextRequest) {
 
     // Notify admin — non-blocking: email failure must not fail the submission
     sendListingSubmitted({
-      model, year: +year, reg, price: +price, location,
+      model, year: +year, reg, price: priceOnEnquiry ? 0 : +price, currency: data.currency, location,
       equip, condition,
       sellerName, sellerEmail: body.sellerEmail,
       contactEmail, id: data.id,
@@ -78,7 +86,7 @@ export async function GET(req: NextRequest) {
   // messages to the seller when contact_pref is 'message'.
   let query = supabase
     .from('listings')
-    .select('id,model,year,reg,hours,price,location,equip,condition,ifr,contact_pref,seller_id,type_rating,photos,approved_at,seller_name,certified,certification_requested,engine_times,prop_times,time_basis,description,airframe_notes,engine_notes')
+    .select('id,model,year,reg,hours,price,price_on_enquiry,currency,location,lat,lon,equip,condition,ifr,contact_pref,seller_id,type_rating,photos,approved_at,seller_name,certified,certification_requested,engine_times,prop_times,time_basis,description,airframe_notes,engine_notes,interior_notes,exterior_notes')
     .eq('status', 'approved')
   if (model) query = query.eq('model', model)
 
@@ -90,9 +98,15 @@ export async function GET(req: NextRequest) {
 // PATCH /api/listings — owner edits their own listing (any status)
 export async function PATCH(req: NextRequest) {
   try {
+    const userId = await getVerifiedUserId(req)
+    if (!userId) return NextResponse.json({ error: 'Not authorized' }, { status: 401 })
+    if (!(await checkRateLimit(`listings-patch:${userId}`, 20, 600))) {
+      return NextResponse.json({ error: 'Too many requests — please try again later.' }, { status: 429 })
+    }
+
     const body = await req.json()
-    const { userId, listingId, edits } = body
-    if (!userId || !listingId || !edits) {
+    const { listingId, edits } = body
+    if (!listingId || !edits) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
     }
 
@@ -110,7 +124,10 @@ export async function PATCH(req: NextRequest) {
       reg:           edits.reg?.toUpperCase(),
       hours:         Number(edits.hours) || undefined,
       price:         Number(edits.price) || undefined,
+      currency:      CURRENCIES.includes(edits.currency) ? edits.currency : undefined,
       location:      edits.location,
+      lat:           typeof edits.lat === 'number' ? edits.lat : null,
+      lon:           typeof edits.lon === 'number' ? edits.lon : null,
       equip:         edits.equip || null,
       condition:     edits.condition,
       contact_email: edits.contact_email,
@@ -127,9 +144,15 @@ export async function PATCH(req: NextRequest) {
 // DELETE /api/listings — owner deletes their own listing
 export async function DELETE(req: NextRequest) {
   try {
+    const userId = await getVerifiedUserId(req)
+    if (!userId) return NextResponse.json({ error: 'Not authorized' }, { status: 401 })
+    if (!(await checkRateLimit(`listings-delete:${userId}`, 20, 600))) {
+      return NextResponse.json({ error: 'Too many requests — please try again later.' }, { status: 429 })
+    }
+
     const body = await req.json()
-    const { userId, listingId } = body
-    if (!userId || !listingId) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+    const { listingId } = body
+    if (!listingId) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
 
     const supabase = createServerClient()
     const { data: existing } = await supabase.from('listings').select('seller_id').eq('id', listingId).single()

@@ -1,9 +1,10 @@
 'use client'
 // src/components/ui/LeftPanel.tsx
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import type { Params } from '../AppShell'
 import { findStopovers, calcLegs, servesAircraft } from '@/lib/airports'
 import type { APEntry as APEntryNonNull } from '@/lib/airports'
+import AirportPicker, { type RemoteAirport } from '@/components/ui/AirportPicker'
 
 type APEntry = APEntryNonNull | null
 
@@ -11,6 +12,7 @@ type Props = {
   params: Params
   onChange: (p: Params) => void
   onHomeAP: (code: string) => void
+  onHomeAirportSelect: (ap: RemoteAirport | null) => void
   onRoutCalc: (from: string, to: string) => { from: APEntry; to: APEntry }
   onFind: () => void
   homeAp: { icao: string; name?: string } | null
@@ -114,9 +116,7 @@ function TypeSeg({ jet, turbo, piston, onChange }: {
   )
 }
 
-export default function LeftPanel({ params, onChange, onHomeAP, onRoutCalc, onFind, homeAp, selAC, onStopsChange, onRouteWaypoints, windLevel = 'FL350', windLoaded }: Props) {
-  const [apVal, setApVal]           = useState('')
-  const [apName, setApName]         = useState('')
+export default function LeftPanel({ params, onChange, onHomeAP, onHomeAirportSelect, onRoutCalc, onFind, homeAp, selAC, onStopsChange, onRouteWaypoints, windLevel = 'FL350', windLoaded }: Props) {
   const [rtA, setRtA]               = useState('')
   const [rtB, setRtB]               = useState('')
   const [routeRes, setRouteRes]     = useState<{ nm: number; km: number } | null>(null)
@@ -153,15 +153,11 @@ export default function LeftPanel({ params, onChange, onHomeAP, onRoutCalc, onFi
     if (!advancedMode) applySimpleBudget(hoursPerYear, totalBudgetPerYear)
   }, []) // eslint-disable-line
 
-  const handleAP = useCallback((val: string) => {
-    setApVal(val)
+  const handleHomeAirportSelect = (ap: RemoteAirport | null) => {
+    onHomeAirportSelect(ap)
     // Mirror the home airport straight into the route's "From" field
-    setRtA(val)
-    if (val.length >= 3) {
-      onHomeAP(val)
-      setApName('Airport set')
-    } else { setApName('') }
-  }, [onHomeAP])
+    if (ap) setRtA(ap.icao)
+  }
 
   const handleRoute = () => {
     setRouteErr(''); setRouteRes(null)
@@ -219,11 +215,16 @@ export default function LeftPanel({ params, onChange, onHomeAP, onRoutCalc, onFi
         <div className="pp-group">
           <div className="pp-field">
             <div className="pp-field-label">Home airport</div>
-            <input className="pp-input" value={apVal} placeholder="ICAO or IATA"
-              onChange={e => handleAP(e.target.value.toUpperCase())} maxLength={20} />
-            {apName && (
+            <AirportPicker
+              className="pp-input"
+              placeholder="Search any airport worldwide…"
+              initialLabel={homeAp ? `${homeAp.icao} — ${homeAp.name}` : ''}
+              hasValue={!!homeAp}
+              onChange={handleHomeAirportSelect}
+            />
+            {homeAp && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, color: '#0a84ff', fontWeight: 500 }}>
-                <span>✓</span><span>{homeAp?.name ?? 'Airport set'}</span>
+                <span>✓</span><span>{homeAp.name}</span>
               </div>
             )}
             {windLoaded && (

@@ -24,8 +24,12 @@ export type Listing = {
   year: number
   reg: string
   hours: number
-  price: number
+  price: number | null
+  price_on_enquiry: boolean
+  currency: string
   location: string
+  lat: number | null
+  lon: number | null
   equip: string | null
   condition: string
   engines: number | null
@@ -47,6 +51,8 @@ export type Listing = {
   description: string | null
   airframe_notes: string | null
   engine_notes: string | null
+  interior_notes: string | null
+  exterior_notes: string | null
 }
 
 export type Inquiry = {

@@ -1,7 +1,9 @@
 'use client'
 // src/components/ui/MarketTab.tsx
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { AC } from '@/lib/aircraft'
+import { fmtPrice } from '@/lib/currency'
 import type { Listing } from '@/lib/supabase'
 import FavoriteButton from './FavoriteButton'
 import CompareToggle from './CompareToggle'
@@ -25,8 +27,8 @@ for (const k of Object.keys(AC_FUEL)) {
   else if (v === 'AvGas' || v === 'avgas') AC_FUEL[k] = 'avgas'
 }
 
-function ListingCard({ l, onClick, fmtPrice, isFavorite, onToggleFavorite, isComparing, compareDisabled, onToggleCompare }: {
-  l: Listing; onClick: () => void; fmtPrice: (p: number | null) => string
+function ListingCard({ l, onClick, isFavorite, onToggleFavorite, isComparing, compareDisabled, onToggleCompare }: {
+  l: Listing; onClick: () => void
   isFavorite: boolean; onToggleFavorite: () => void
   isComparing: boolean; compareDisabled: boolean; onToggleCompare: () => void
 }) {
@@ -55,7 +57,7 @@ function ListingCard({ l, onClick, fmtPrice, isFavorite, onToggleFavorite, isCom
       {/* Photo */}
       <div style={{ width: '100%', aspectRatio: '4/3', background: 'rgba(118,118,128,0.08)', position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
         {photos.length > 0
-          ? <img src={photos[idx]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          ? <Image src={photos[idx]} alt="" fill sizes="(max-width: 700px) 50vw, 320px" style={{ objectFit: 'cover' }} />
           : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, color: 'rgba(0,0,0,0.12)' }}>✈</div>
         }
         {/* Nav arrows */}
@@ -72,7 +74,7 @@ function ListingCard({ l, onClick, fmtPrice, isFavorite, onToggleFavorite, isCom
           </>
         )}
         <div style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', color: '#fff', fontSize: 12, fontWeight: 700, padding: '3px 8px', borderRadius: 7 }}>
-          {fmtPrice(l.price)}
+          {fmtPrice(l.price, l.currency)}
         </div>
         <FavoriteButton active={isFavorite} onToggle={onToggleFavorite} size={28} style={{ position: 'absolute', top: 8, left: 8 }} />
         <CompareToggle active={isComparing} disabled={compareDisabled} onToggle={onToggleCompare} size={28} style={{ position: 'absolute', bottom: 8, left: 8 }} />
@@ -109,7 +111,7 @@ type Props = {
   initialSearch?: string
   onSearchChange?: (s: string) => void
   onAuthRequired: (message?: string) => void
-  onOpenMessage: (l: { id: string; model: string; year: number; price: number | null; seller_id: string | null }) => void
+  onOpenMessage: (l: { id: string; model: string; year: number; price: number | null; currency?: string | null; seller_id: string | null }) => void
   openListingId?: string | null
   onOpenListingHandled?: () => void
   favoriteIds: Set<string>
@@ -125,11 +127,6 @@ type Sort         = 'newest' | 'price_asc' | 'price_desc'
 const CURRENT_YEAR = new Date().getFullYear()
 const MAX_HOURS    = 50000
 
-function fmtPrice(usd: number | null | undefined): string {
-  if (!usd) return '—'
-  return usd >= 1_000_000 ? `$${(usd / 1_000_000).toFixed(1)}M` : `$${Math.round(usd / 1000)}K`
-}
-
 // ── Listing detail modal ──────────────────────────────────────
 function ListingModal({ listing, onClose, onContact, user, onAuthRequired, onOpenMessage, isFavorite, onToggleFavorite }: {
   listing: Listing
@@ -137,7 +134,7 @@ function ListingModal({ listing, onClose, onContact, user, onAuthRequired, onOpe
   onContact: (l: Listing) => void
   user: { id: string; name: string; role: string } | null
   onAuthRequired: (message?: string) => void
-  onOpenMessage: (l: { id: string; model: string; year: number; price: number | null; seller_id: string | null }) => void
+  onOpenMessage: (l: { id: string; model: string; year: number; price: number | null; currency?: string | null; seller_id: string | null }) => void
   isFavorite: boolean
   onToggleFavorite: () => void
 }) {
@@ -164,17 +161,18 @@ function ListingModal({ listing, onClose, onContact, user, onAuthRequired, onOpe
         <div style={{ position: 'relative', aspectRatio: '16/9', background: '#f0f0f3', flexShrink: 0 }}>
           {photos.length > 0 ? (
             <>
-              <img src={photos[photoIdx]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <Image src={photos[photoIdx]} alt="" fill sizes="(max-width: 700px) 100vw, 600px" style={{ objectFit: 'cover' }} priority />
               {/* Thumbnails */}
               {photos.length > 1 && (
                 <div style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 6 }}>
                   {photos.map((p, i) => (
                     <div key={i} onClick={() => setPhotoIdx(i)} style={{
+                      position: 'relative',
                       width: 48, height: 34, borderRadius: 7, overflow: 'hidden', cursor: 'pointer',
                       border: i === photoIdx ? '2px solid #fff' : '2px solid rgba(255,255,255,0.4)',
                       boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
                     }}>
-                      <img src={p} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <Image src={p} alt="" fill sizes="48px" style={{ objectFit: 'cover' }} />
                     </div>
                   ))}
                 </div>
@@ -226,7 +224,7 @@ function ListingModal({ listing, onClose, onContact, user, onAuthRequired, onOpe
               </div>
             </div>
             <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.03em', color: '#0a84ff' }}>
-              {fmtPrice(listing.price)}
+              {fmtPrice(listing.price, listing.currency)}
             </div>
           </div>
 
@@ -259,6 +257,8 @@ function ListingModal({ listing, onClose, onContact, user, onAuthRequired, onOpe
             [listing.equip,                   'Avionics & equipment'],
             [(listing as any).airframe_notes, 'Airframe notes'],
             [(listing as any).engine_notes,   'Engine notes'],
+            [(listing as any).interior_notes, 'Interior remarks'],
+            [(listing as any).exterior_notes, 'Exterior remarks'],
           ].filter(([v]) => v).map(([text, label]) => (
             <div key={label as string} style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>{label}</div>
@@ -277,7 +277,7 @@ function ListingModal({ listing, onClose, onContact, user, onAuthRequired, onOpe
           ) : (
             <button onClick={() => {
               if (!user) { onAuthRequired('Sign in to message this seller'); return }
-              onOpenMessage({ id: listing.id, model: listing.model, year: listing.year, price: listing.price, seller_id: (listing as any).seller_id ?? null })
+              onOpenMessage({ id: listing.id, model: listing.model, year: listing.year, price: listing.price, currency: listing.currency, seller_id: (listing as any).seller_id ?? null })
               onClose()
             }} style={{
               width: '100%', height: 50, background: '#0a84ff', border: 'none',
@@ -496,7 +496,7 @@ export default function MarketTab({ listings: initialListings, onContact, onSell
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
                 {filtered.map(l => (
-                  <ListingCard key={l.id} l={l} onClick={() => setSelListing(l)} fmtPrice={fmtPrice}
+                  <ListingCard key={l.id} l={l} onClick={() => setSelListing(l)}
                     isFavorite={favoriteIds.has(l.id)} onToggleFavorite={() => onToggleFavorite(l.id)}
                     isComparing={compareIds.includes(l.id)}
                     compareDisabled={!compareIds.includes(l.id) && compareIds.length >= MAX_COMPARE}

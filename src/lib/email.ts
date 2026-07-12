@@ -1,5 +1,6 @@
 // src/lib/email.ts
 import { Resend } from 'resend'
+import { fmtPriceFull } from './currency'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const ADMIN = process.env.ADMIN_EMAIL!
@@ -22,7 +23,7 @@ function safeEmail(email: string): string | undefined {
 }
 
 export async function sendListingSubmitted(listing: {
-  model: string; year: number; reg: string; price: number
+  model: string; year: number; reg: string; price: number; currency?: string | null
   location: string; equip?: string; condition: string
   sellerName: string; sellerEmail: string; contactEmail: string
   id: string
@@ -36,7 +37,7 @@ export async function sendListingSubmitted(listing: {
       <table>
         <tr><td><b>Aircraft</b></td><td>${esc(String(listing.year))} ${esc(listing.model)}</td></tr>
         <tr><td><b>Reg</b></td><td>${esc(listing.reg)}</td></tr>
-        <tr><td><b>Price</b></td><td>$${listing.price.toLocaleString()}</td></tr>
+        <tr><td><b>Price</b></td><td>${fmtPriceFull(listing.price, listing.currency)}</td></tr>
         <tr><td><b>Location</b></td><td>${esc(listing.location)}</td></tr>
         <tr><td><b>Condition</b></td><td>${esc(listing.condition)}</td></tr>
         <tr><td><b>Equipment</b></td><td>${esc(listing.equip) || 'N/A'}</td></tr>
@@ -50,7 +51,7 @@ export async function sendListingSubmitted(listing: {
 }
 
 export async function sendListingApproved(listing: {
-  model: string; year: number; price: number; typeRating: boolean
+  model: string; year: number; price: number; currency?: string | null; typeRating: boolean
   sellerName: string; sellerEmail: string
 }) {
   await resend.emails.send({
@@ -62,7 +63,7 @@ export async function sendListingApproved(listing: {
       <p>Hi ${esc(listing.sellerName)},</p>
       <p>Your <b>${esc(String(listing.year))} ${esc(listing.model)}</b> listing is now live on PerfectPlane.</p>
       <ul>
-        <li>Price: $${listing.price.toLocaleString()}</li>
+        <li>Price: ${fmtPriceFull(listing.price, listing.currency)}</li>
         <li>Type rating: ${listing.typeRating ? 'Required' : 'Not required'}</li>
       </ul>
       <p>Interested buyers can now contact you through the platform.</p>
@@ -115,7 +116,7 @@ export async function sendJobApplication(application: {
 }
 
 export async function sendBuyerInquiry(inquiry: {
-  listingModel: string; listingYear: number; listingReg: string; listingPrice: number
+  listingModel: string; listingYear: number; listingReg: string; listingPrice: number; currency?: string | null
   sellerEmail?: string | null; sellerName?: string | null
   buyerName: string; buyerEmail: string; buyerPhone?: string; message?: string
 }) {
@@ -135,7 +136,7 @@ export async function sendBuyerInquiry(inquiry: {
       <ul>
         <li>${esc(String(inquiry.listingYear))} ${esc(inquiry.listingModel)}</li>
         <li>Reg: ${esc(inquiry.listingReg)}</li>
-        <li>Price: $${inquiry.listingPrice.toLocaleString()}</li>
+        <li>Price: ${fmtPriceFull(inquiry.listingPrice, inquiry.currency)}</li>
       </ul>
       <h3>Buyer</h3>
       <ul>

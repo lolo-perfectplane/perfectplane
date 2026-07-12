@@ -1,12 +1,9 @@
 'use client'
 // src/components/ui/CompareModal.tsx
+import Image from 'next/image'
 import type { Listing } from '@/lib/supabase'
 import { AC } from '@/lib/aircraft'
-
-function fmtPrice(usd: number | null | undefined): string {
-  if (!usd) return '—'
-  return usd >= 1_000_000 ? `$${(usd / 1_000_000).toFixed(1)}M` : `$${Math.round(usd / 1000)}K`
-}
+import { fmtPrice } from '@/lib/currency'
 
 const typeLabel: Record<string, string> = { jet: 'Jet', turbo: 'Turboprop', piston: 'Piston' }
 const gearLabel: Record<string, string> = { retractable: 'Retractable', tricycle: 'Tricycle', tailwheel: 'Tail-wheel' }
@@ -17,10 +14,17 @@ type Row = {
   value: (l: Listing) => string
   numeric?: (l: Listing) => number | null
   best?: 'min' | 'max'
+  // Some rows (price) are only meaningfully comparable when every listing
+  // shares the same unit — highlighting a "best" across mixed currencies
+  // would just be wrong, not merely imprecise.
+  eligible?: (listings: Listing[]) => boolean
 }
 
 const rows: Row[] = [
-  { label: 'Price', value: l => fmtPrice(l.price), numeric: l => l.price ?? null, best: 'min' },
+  {
+    label: 'Price', value: l => fmtPrice(l.price, l.currency), numeric: l => l.price ?? null, best: 'min',
+    eligible: listings => new Set(listings.map(l => l.currency || 'USD')).size === 1,
+  },
   { label: 'Year', value: l => String(l.year ?? '—') },
   { label: 'Total time', value: l => l.hours != null ? `${l.hours.toLocaleString()} h` : '—', numeric: l => l.hours ?? null, best: 'min' },
   { label: 'Condition', value: l => l.condition ?? '—' },
@@ -132,9 +136,9 @@ export default function CompareModal({ listings, onClose, onRemove, onViewListin
                         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                       }}>✕</button>
                     </div>
-                    <div onClick={() => onViewListing(l.id)} style={{ cursor: 'pointer', borderRadius: 10, overflow: 'hidden', width: '100%', aspectRatio: '16/10', background: 'rgba(118,118,128,0.08)', flexShrink: 0 }}>
+                    <div onClick={() => onViewListing(l.id)} style={{ position: 'relative', cursor: 'pointer', borderRadius: 10, overflow: 'hidden', width: '100%', aspectRatio: '16/10', background: 'rgba(118,118,128,0.08)', flexShrink: 0 }}>
                       {photos.length > 0
-                        ? <img src={photos[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        ? <Image src={photos[0]} alt="" fill sizes="240px" style={{ objectFit: 'cover' }} />
                         : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, color: 'rgba(0,0,0,0.15)' }}>✈</div>
                       }
                     </div>
@@ -148,7 +152,7 @@ export default function CompareModal({ listings, onClose, onRemove, onViewListin
                     const vals = listings.map(x => r.numeric?.(x) ?? null)
                     const nums = vals.filter((v): v is number => v != null)
                     const thisVal = r.numeric?.(l) ?? null
-                    const isBest = r.best && thisVal != null && nums.length > 1 &&
+                    const isBest = r.best && (r.eligible?.(listings) ?? true) && thisVal != null && nums.length > 1 &&
                       new Set(nums).size > 1 &&
                       (r.best === 'min' ? thisVal === Math.min(...nums) : thisVal === Math.max(...nums))
                     return (

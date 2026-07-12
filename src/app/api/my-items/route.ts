@@ -3,11 +3,11 @@
 // (pending/approved/rejected) so they can manage them without admin help.
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
+import { getVerifiedUserId } from '@/lib/auth-server'
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url)
-  const userId = searchParams.get('userId')
-  if (!userId) return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
+  const userId = await getVerifiedUserId(req)
+  if (!userId) return NextResponse.json({ error: 'Not authorized' }, { status: 401 })
 
   const supabase = createServerClient()
   const [{ data: listings, error: lErr }, { data: jobs, error: jErr }] = await Promise.all([

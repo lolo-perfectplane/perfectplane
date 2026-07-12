@@ -1,9 +1,11 @@
 'use client'
 // src/components/mobile/MobileMarket.tsx
 import React, { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import type { Listing } from '@/lib/supabase'
 import { createClient } from '@/lib/supabase'
 import { AC } from '@/lib/aircraft'
+import { fmtPrice } from '@/lib/currency'
 import FavoriteButton from '@/components/ui/FavoriteButton'
 import CompareToggle from '@/components/ui/CompareToggle'
 import CompareModal from '@/components/ui/CompareModal'
@@ -23,7 +25,7 @@ type User = { id: string; name: string; email: string; role: string }
 type Props = {
   listings: Listing[]; onContact: (l: Listing) => void; onSell: () => void; user: User | null; initialSearch?: string
   onAuthRequired: (message?: string) => void
-  onOpenMessage: (l: { id: string; model: string; year: number; price: number | null; seller_id: string | null }) => void
+  onOpenMessage: (l: { id: string; model: string; year: number; price: number | null; currency?: string | null; seller_id: string | null }) => void
   openListingId?: string | null
   onOpenListingHandled?: () => void
   favoriteIds: Set<string>
@@ -40,12 +42,6 @@ const TAB_H        = 76
 
 const YEARS = Array.from({ length: CURRENT_YEAR - 1939 }, (_, i) => 1940 + i)
 
-function fmtPrice(p: number | null) {
-  if (!p) return 'POA'
-  if (p >= 1_000_000) return `$${(p / 1_000_000).toFixed(1)}M`
-  if (p >= 1_000)     return `$${(p / 1_000).toFixed(0)}K`
-  return `$${p}`
-}
 
 // ── Listing card with photo navigation ────────────────────────
 function MobileListingCard({ l, onClick, isFavorite, onToggleFavorite, isComparing, compareDisabled, onToggleCompare }: {
@@ -76,7 +72,7 @@ function MobileListingCard({ l, onClick, isFavorite, onToggleFavorite, isCompari
         style={{ width: '100%', aspectRatio: '4/3', background: 'rgba(118,118,128,0.08)', position: 'relative', overflow: 'hidden', flexShrink: 0 }}
         onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         {photos.length > 0
-          ? <img src={photos[idx]} alt={l.model ?? ''} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          ? <Image src={photos[idx]} alt={l.model ?? ''} fill sizes="(max-width: 500px) 50vw, 280px" style={{ objectFit: 'cover' }} />
           : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, color: 'rgba(0,0,0,0.12)' }}>✈</div>
         }
         {photos.length > 1 && (
@@ -90,7 +86,7 @@ function MobileListingCard({ l, onClick, isFavorite, onToggleFavorite, isCompari
             </div>
           </>
         )}
-        <div style={{ position: 'absolute', top: 7, right: 7, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 6 }}>{fmtPrice(l.price ?? null)}</div>
+        <div style={{ position: 'absolute', top: 7, right: 7, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 6 }}>{fmtPrice(l.price ?? null, l.currency)}</div>
         <FavoriteButton active={isFavorite} onToggle={onToggleFavorite} size={26} style={{ position: 'absolute', top: 7, left: 7 }} />
         <CompareToggle active={isComparing} disabled={compareDisabled} onToggle={onToggleCompare} size={26} style={{ position: 'absolute', bottom: 7, left: 7 }} />
       </div>
@@ -297,7 +293,7 @@ function ListingSheet({ listing, onClose, onContact, user, onAuthRequired, onOpe
   onContact: (l: Listing) => void
   user: User | null
   onAuthRequired: (message?: string) => void
-  onOpenMessage: (l: { id: string; model: string; year: number; price: number | null; seller_id: string | null }) => void
+  onOpenMessage: (l: { id: string; model: string; year: number; price: number | null; currency?: string | null; seller_id: string | null }) => void
   isFavorite: boolean
   onToggleFavorite: () => void
 }) {
@@ -355,6 +351,8 @@ function ListingSheet({ listing, onClose, onContact, user, onAuthRequired, onOpe
   const description   = (listing as any).description    as string | null
   const airframeNotes = (listing as any).airframe_notes as string | null
   const engineNotes   = (listing as any).engine_notes   as string | null
+  const interiorNotes = (listing as any).interior_notes as string | null
+  const exteriorNotes = (listing as any).exterior_notes as string | null
 
   const specRows = [
     listing.year        && ['Year',         String(listing.year)],
@@ -414,7 +412,7 @@ function ListingSheet({ listing, onClose, onContact, user, onAuthRequired, onOpe
             </div>
 
             {photos.length > 0 ? (
-              <img src={photos[photoIdx]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              <Image src={photos[photoIdx]} alt="" fill sizes="100vw" style={{ objectFit: 'cover' }} priority />
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 48, color: '#c7c7cc' }}>✈</div>
             )}
@@ -432,7 +430,7 @@ function ListingSheet({ listing, onClose, onContact, user, onAuthRequired, onOpe
               </>
             )}
             <div style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', color: '#fff', fontSize: 13, fontWeight: 700, padding: '3px 10px', borderRadius: 8, zIndex: 4 }}>
-              {fmtPrice(listing.price ?? null)}
+              {fmtPrice(listing.price ?? null, listing.currency)}
             </div>
             <FavoriteButton active={isFavorite} onToggle={onToggleFavorite} size={32} style={{ position: 'absolute', top: 10, right: 10, zIndex: 4 }} />
           </div>
@@ -468,6 +466,8 @@ function ListingSheet({ listing, onClose, onContact, user, onAuthRequired, onOpe
               listing.equip && ['Avionics',       listing.equip],
               airframeNotes && ['Airframe notes', airframeNotes],
               engineNotes   && ['Engine notes',   engineNotes],
+              interiorNotes && ['Interior remarks', interiorNotes],
+              exteriorNotes && ['Exterior remarks', exteriorNotes],
             ].filter(Boolean).map(([label, text]: any) => (
               <div key={label as string} style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>{label}</div>
@@ -490,7 +490,7 @@ function ListingSheet({ listing, onClose, onContact, user, onAuthRequired, onOpe
             ) : (
               <button onClick={() => {
                 if (!user) { onAuthRequired('Sign in to message this seller'); return }
-                onOpenMessage({ id: listing.id, model: listing.model, year: listing.year, price: listing.price, seller_id: (listing as any).seller_id ?? null })
+                onOpenMessage({ id: listing.id, model: listing.model, year: listing.year, price: listing.price, currency: listing.currency, seller_id: (listing as any).seller_id ?? null })
                 close()
               }} style={{
                 width: '100%', height: 50, background: '#0a84ff', border: 'none',

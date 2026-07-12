@@ -1,10 +1,14 @@
 'use client'
 // src/components/listings/Modals.tsx
 import React, { useState, useEffect, useRef, useMemo } from 'react'
+import Image from 'next/image'
 import { AC } from '@/lib/aircraft'
-import { AIRPORTS, searchAirports, type APEntry } from '@/lib/airports'
+import type { RemoteAirport } from '@/lib/airports-remote'
+import AirportPicker from '@/components/ui/AirportPicker'
 import { createClient } from '@/lib/supabase'
 import type { Listing } from '@/lib/supabase'
+import { authFetch } from '@/lib/authFetch'
+import { CURRENCIES, fmtPrice } from '@/lib/currency'
 
 type User = { id: string; name: string; email: string; role: string }
 
@@ -70,10 +74,16 @@ export function SellModal({ user, onClose, onSuccess }: SellProps) {
   const [reg,             setReg]             = useState('')
   const [hours,           setHours]           = useState('')
   const [price,           setPrice]           = useState('')
-  const [loc,             setLoc]             = useState<APEntry | null>(null)
+  const [currency,        setCurrency]        = useState<typeof CURRENCIES[number]>('USD')
+  const [loc,             setLoc]             = useState<RemoteAirport | null>(null)
   const [equip,           setEquip]           = useState('')
   const [cond,            setCond]            = useState('Excellent')
   const [ifr,             setIfr]             = useState(false)
+  const [priceOnEnquiry,  setPriceOnEnquiry]  = useState(false)
+  const [interiorNotes,   setInteriorNotes]   = useState('')
+  const [exteriorNotes,   setExteriorNotes]   = useState('')
+  const [showInterior,    setShowInterior]    = useState(false)
+  const [showExterior,    setShowExterior]    = useState(false)
   const [contact,         setContact]         = useState(user.email)
   const [contactPref,     setContactPref]     = useState<'email' | 'message'>('email')
   const [photos,          setPhotos]          = useState<string[]>([])
@@ -108,7 +118,7 @@ export function SellModal({ user, onClose, onSuccess }: SellProps) {
   const selectModel = (name: string) => { setModel(name); setModelQuery(name); setModelOpen(false) }
 
   const submit = async () => {
-    if (!model || !year || !reg || !hours || !price || !loc?.icao) {
+    if (!model || !year || !reg || !hours || !loc?.icao || (!priceOnEnquiry && !price)) {
       setMsg({ text: 'Please fill all required fields.', ok: false }); return
     }
     setLoading(true); setMsg(null)
@@ -118,7 +128,11 @@ export function SellModal({ user, onClose, onSuccess }: SellProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model, year: +year, reg: reg.toUpperCase(), hours: +hours,
-          price: +price, location: `${loc.icao} — ${loc.name}`,
+          price: priceOnEnquiry ? null : +price,
+          currency,
+          priceOnEnquiry,
+          location: `${loc.icao} — ${loc.name}`,
+          lat: loc.lat, lon: loc.lon,
           equip: showEquip ? equip : null,
           condition: cond,
           ifr,
@@ -133,6 +147,8 @@ export function SellModal({ user, onClose, onSuccess }: SellProps) {
           description:    showDesc        ? description    : null,
           airframeNotes:  showAirframe    ? airframeNotes  : null,
           engineNotes:    showEngineNotes ? engineNotes    : null,
+          interiorNotes:  showInterior    ? interiorNotes  : null,
+          exteriorNotes:  showExterior    ? exteriorNotes  : null,
         }),
       })
       const d = await r.json()
@@ -230,8 +246,24 @@ export function SellModal({ user, onClose, onSuccess }: SellProps) {
               <input style={inp} type="number" value={hours} onChange={e => setHours(e.target.value)} placeholder="1250" />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-              <label style={lbl}>Asking price (USD)</label>
-              <input style={inp} type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="450000" />
+              <label style={lbl}>Asking price</label>
+              {priceOnEnquiry
+                ? <div style={{ ...inp, display: 'flex', alignItems: 'center', color: '#86868b', fontWeight: 500 }}>On enquiry</div>
+                : (
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <select value={currency} onChange={e => setCurrency(e.target.value as typeof CURRENCIES[number])}
+                      style={{ ...inp, width: 78, flexShrink: 0, cursor: 'pointer', appearance: 'none' as any, textAlign: 'center', padding: '0 4px' }}>
+                      {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <input style={inp} type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="450000" />
+                  </div>
+                )
+              }
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, cursor: 'pointer' }}>
+                <input type="checkbox" checked={priceOnEnquiry} onChange={e => setPriceOnEnquiry(e.target.checked)}
+                  style={{ width: 14, height: 14, accentColor: '#0a84ff' }} />
+                <span style={{ fontSize: 12, color: '#86868b' }}>Price on enquiry</span>
+              </label>
             </div>
           </div>
 
@@ -291,7 +323,11 @@ export function SellModal({ user, onClose, onSuccess }: SellProps) {
           {/* Location */}
           <div style={fg}>
             <label style={lbl}>Location (airport)</label>
-            <AirportPicker value={loc} onChange={setLoc} />
+            <AirportPicker
+              initialLabel={loc ? `${loc.icao} — ${loc.name}` : ''}
+              hasValue={!!loc}
+              onChange={setLoc}
+            />
           </div>
 
           {/* Condition + Email */}
@@ -371,6 +407,16 @@ export function SellModal({ user, onClose, onSuccess }: SellProps) {
               <textarea style={taStyle} value={engineNotes} onChange={e => setEngineNotes(e.target.value)}
                 placeholder="Overhaul dates, compressions, AD compliance, oil analysis trends…" rows={3} />
             </TextSection>
+
+            <TextSection label="Interior remarks" checked={showInterior} onToggle={setShowInterior}>
+              <textarea style={taStyle} value={interiorNotes} onChange={e => setInteriorNotes(e.target.value)}
+                placeholder="Seat upholstery, refurb date, cabin layout, headliner, carpets…" rows={3} />
+            </TextSection>
+
+            <TextSection label="Exterior remarks" checked={showExterior} onToggle={setShowExterior}>
+              <textarea style={taStyle} value={exteriorNotes} onChange={e => setExteriorNotes(e.target.value)}
+                placeholder="Paint condition, last repaint date, livery, known blemishes…" rows={3} />
+            </TextSection>
           </div>
 
           {/* Photos */}
@@ -403,75 +449,6 @@ function TextSection({ label, checked, onToggle, children }: {
         <span style={{ fontSize: 13, fontWeight: 600, color: '#1d1d1f' }}>{label}</span>
       </label>
       {checked && children}
-    </div>
-  )
-}
-
-// ── AirportPicker ─────────────────────────────────────────────
-function AirportPicker({ value, onChange }: { value: APEntry | null; onChange: (ap: APEntry | null) => void }) {
-  const [query, setQuery]       = useState(value ? `${value.icao} — ${value.name}` : '')
-  const [results, setResults]   = useState<APEntry[]>([])
-  const [open, setOpen]         = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  const handleInput = (v: string) => {
-    setQuery(v)
-    onChange(null)
-    if (v.trim().length >= 2) {
-      setResults(searchAirports(v, 8))
-      setOpen(true)
-    } else {
-      setResults([])
-      setOpen(false)
-    }
-  }
-
-  const select = (ap: APEntry) => {
-    onChange(ap)
-    setQuery(`${ap.icao} — ${ap.name}`)
-    setOpen(false)
-    setResults([])
-  }
-
-  return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      <input
-        style={{ ...inp, background: value ? 'rgba(10,132,255,0.06)' : inp.background }}
-        type="text"
-        value={query}
-        onChange={e => handleInput(e.target.value)}
-        onFocus={() => { if (results.length) setOpen(true) }}
-        placeholder="Search ICAO, IATA or city…"
-        autoComplete="off"
-      />
-      {value && (
-        <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 14 }}>✓</span>
-      )}
-      {open && results.length > 0 && (
-        <div style={{
-          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 500,
-          background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(20px)',
-          border: '0.5px solid rgba(0,0,0,0.1)', borderRadius: 12,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.14)', overflow: 'hidden',
-        }}>
-          {results.map(ap => (
-            <div key={ap.icao} onMouseDown={() => select(ap)}
-              style={{ padding: '9px 14px', cursor: 'pointer', display: 'flex', gap: 10, alignItems: 'center' }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(10,132,255,0.06)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#0a84ff', fontVariantNumeric: 'tabular-nums', minWidth: 38 }}>{ap.icao}</span>
-              <span style={{ fontSize: 13, color: '#1d1d1f', flex: 1 }}>{ap.name}</span>
-              {ap.iata && <span style={{ fontSize: 11, color: '#86868b' }}>{ap.iata}</span>}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 }
@@ -600,7 +577,7 @@ function AdminPhotoStrip({ photos, onClose }: { photos: string[]; onClose: () =>
     <div style={{ position: 'relative', aspectRatio: '16/9', background: '#f0f0f3', flexShrink: 0 }}>
       {photos.length > 0 ? (
         <>
-          <img src={photos[pidx]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <Image src={photos[pidx]} alt="" fill sizes="(max-width: 700px) 100vw, 600px" style={{ objectFit: 'cover' }} priority />
           {photos.length > 1 && (
             <>
               <button onClick={() => setPidx(i => (i - 1 + photos.length) % photos.length)} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.5)', border: 'none', color: '#fff', width: 32, height: 32, borderRadius: '50%', fontSize: 18, cursor: 'pointer' }}>‹</button>
@@ -639,7 +616,7 @@ export function AdminModal({ userId, onClose, onApproved }: AdminProps) {
 
   const reload = () => {
     setLoading(true)
-    fetch(`/api/admin?userId=${userId}`)
+    authFetch('/api/admin')
       .then(r => r.json())
       .then(d => { setAllListings(d.listings || []); setAllJobs(d.jobs || []); setLoading(false) })
       .catch(() => setLoading(false))
@@ -653,10 +630,10 @@ export function AdminModal({ userId, onClose, onApproved }: AdminProps) {
   const approvedJobs = allJobs.filter(j => j.status === 'approved')
 
   const action = async (id: string, act: 'approve' | 'reject', kind: 'listing' | 'job' = 'listing') => {
-    const r = await fetch('/api/admin', {
+    const r = await authFetch('/api/admin', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, listingId: id, action: act, kind, grantCertification: certGrant[id] ?? false }),
+      body: JSON.stringify({ listingId: id, action: act, kind, grantCertification: certGrant[id] ?? false }),
     })
     const d = await r.json()
     if (d.error) { setMsgs(m => ({ ...m, [id]: { text: d.error, ok: false } })); return }
@@ -665,10 +642,10 @@ export function AdminModal({ userId, onClose, onApproved }: AdminProps) {
   }
 
   const saveEdit = async (id: string, kind: 'listing' | 'job') => {
-    const r = await fetch('/api/admin', {
+    const r = await authFetch('/api/admin', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, listingId: id, action: 'edit', kind, edits: editData }),
+      body: JSON.stringify({ listingId: id, action: 'edit', kind, edits: editData }),
     })
     const d = await r.json()
     if (d.error) { setMsgs(m => ({ ...m, [id]: { text: d.error, ok: false } })); return }
@@ -678,10 +655,10 @@ export function AdminModal({ userId, onClose, onApproved }: AdminProps) {
   }
 
   const deleteItem = async (id: string, kind: 'listing' | 'job') => {
-    const r = await fetch('/api/admin', {
+    const r = await authFetch('/api/admin', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, listingId: id, kind }),
+      body: JSON.stringify({ listingId: id, kind }),
     })
     const d = await r.json()
     if (d.error) { setMsgs(m => ({ ...m, [id]: { text: d.error, ok: false } })); return }
@@ -692,8 +669,6 @@ export function AdminModal({ userId, onClose, onApproved }: AdminProps) {
     setEditId(item.id)
     setEditData({ ...item })
   }
-
-  const fmtPrice = (p: number) => p >= 1e6 ? `$${(p/1e6).toFixed(2)}M` : `$${Math.round(p/1000)}K`
 
   const iBtn = (color: string, bg: string): React.CSSProperties => ({
     height: 32, padding: '0 12px', borderRadius: 8, border: 'none',
@@ -802,7 +777,7 @@ export function AdminModal({ userId, onClose, onApproved }: AdminProps) {
           <div style={{ display: 'flex', gap: 4, padding: '10px 10px 0' }}>
             {photos.map((p, i) => (
               <a key={i} href={p} target="_blank" rel="noreferrer" style={{ flex: i === 0 ? 2 : 1, height: 80, borderRadius: 8, overflow: 'hidden', position: 'relative', display: 'block', flexShrink: 0 }}>
-                <img src={p} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                <Image src={p} alt="" fill sizes="160px" style={{ objectFit: 'cover' }} />
                 {i === 0 && <div style={{ position: 'absolute', bottom: 3, left: 3, background: 'rgba(10,132,255,0.9)', borderRadius: 4, padding: '1px 5px', fontSize: 9, color: '#fff', fontWeight: 600 }}>COVER</div>}
               </a>
             ))}
@@ -824,7 +799,7 @@ export function AdminModal({ userId, onClose, onApproved }: AdminProps) {
               <div style={{ fontSize: 12, color: '#86868b' }}>{l.reg} · {l.hours?.toLocaleString()} h · {l.location}</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-              <div style={{ fontSize: 16, fontWeight: 700 }}>{fmtPrice(l.price)}</div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>{fmtPrice(l.price, l.currency)}</div>
               <div style={{ display: 'flex', gap: 6 }}>
                 {!isEditing && <button onClick={() => startEdit(l)} style={iBtn('#0a84ff', 'rgba(10,132,255,0.1)')}>✏ Edit</button>}
                 {confirmDel === l.id ? (
@@ -843,12 +818,29 @@ export function AdminModal({ userId, onClose, onApproved }: AdminProps) {
           {isEditing && (
             <div style={{ background: 'rgba(10,132,255,0.04)', borderRadius: 10, padding: 12, marginBottom: 10 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                {[['Year', 'year', 'number'], ['Reg', 'reg', 'text'], ['Hours TT', 'hours', 'number'], ['Price (USD)', 'price', 'number'], ['Location', 'location', 'text']].map(([lbl, k, type]) => (
+                {[['Year', 'year', 'number'], ['Reg', 'reg', 'text'], ['Hours TT', 'hours', 'number'], ['Price', 'price', 'number']].map(([lbl, k, type]) => (
                   <div key={k}>
                     <label style={editLbl}>{lbl}</label>
                     <input style={editInp} type={type} value={editData[k] ?? ''} onChange={e => setEditData((d: any) => ({ ...d, [k]: e.target.value }))} />
                   </div>
                 ))}
+                <div>
+                  <label style={editLbl}>Currency</label>
+                  <select style={editInp} value={editData.currency ?? 'USD'} onChange={e => setEditData((d: any) => ({ ...d, currency: e.target.value }))}>
+                    {CURRENCIES.map(c => <option key={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={editLbl}>Location</label>
+                  <AirportPicker
+                    initialLabel={editData.location ?? ''}
+                    hasValue={editData.lat != null && editData.lon != null}
+                    inputStyle={editInp}
+                    onChange={ap => setEditData((d: any) => ap
+                      ? { ...d, location: `${ap.icao} — ${ap.name}`, lat: ap.lat, lon: ap.lon }
+                      : { ...d, location: '', lat: null, lon: null })}
+                  />
+                </div>
                 <div>
                   <label style={editLbl}>Condition</label>
                   <select style={editInp} value={editData.condition ?? ''} onChange={e => setEditData((d: any) => ({ ...d, condition: e.target.value }))}>
@@ -882,7 +874,7 @@ export function AdminModal({ userId, onClose, onApproved }: AdminProps) {
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {(editData.photos as string[]).map((p, i) => (
                       <div key={p + i} style={{ position: 'relative', width: 64, height: 64, borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
-                        <img src={p} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        <Image src={p} alt="" fill sizes="64px" style={{ objectFit: 'cover' }} />
                         <button
                           onClick={() => setEditData((d: any) => ({ ...d, photos: (d.photos as string[]).filter((_, j) => j !== i) }))}
                           style={{ position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.65)', color: '#fff', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
@@ -946,7 +938,7 @@ export function AdminModal({ userId, onClose, onApproved }: AdminProps) {
                 <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 3 }}>{viewListing.year} {viewListing.model}</div>
                 <div style={{ fontSize: 13, color: '#86868b' }}>{viewListing.reg} · {viewListing.hours?.toLocaleString()} h · {viewListing.location}</div>
               </div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: '#0a84ff' }}>{fmtPrice(viewListing.price)}</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#0a84ff' }}>{fmtPrice(viewListing.price, viewListing.currency)}</div>
             </div>
             {/* Spec grid */}
             {(() => {
@@ -976,6 +968,8 @@ export function AdminModal({ userId, onClose, onApproved }: AdminProps) {
               [viewListing.equip,          'Avionics & equipment'],
               [viewListing.airframe_notes, 'Airframe notes'],
               [viewListing.engine_notes,   'Engine notes'],
+              [viewListing.interior_notes, 'Interior remarks'],
+              [viewListing.exterior_notes, 'Exterior remarks'],
             ].filter(([v]) => v).map(([text, label]) => (
               <div key={label as string} style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>{label}</div>
@@ -1087,7 +1081,7 @@ export function MyItemsModal({ userId, onClose, onChanged }: MyItemsProps) {
 
   const reload = () => {
     setLoading(true)
-    fetch(`/api/my-items?userId=${userId}`)
+    authFetch('/api/my-items')
       .then(r => r.json())
       .then(d => { setMyListings(d.listings || []); setMyJobs(d.jobs || []); setLoading(false) })
       .catch(() => setLoading(false))
@@ -1097,9 +1091,9 @@ export function MyItemsModal({ userId, onClose, onChanged }: MyItemsProps) {
   const startEdit = (item: any) => { setEditId(item.id); setEditData({ ...item }) }
 
   const saveListing = async (id: string) => {
-    const r = await fetch('/api/listings', {
+    const r = await authFetch('/api/listings', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, listingId: id, edits: editData }),
+      body: JSON.stringify({ listingId: id, edits: editData }),
     })
     const d = await r.json()
     if (d.error) { setMsgs(m => ({ ...m, [id]: { text: d.error, ok: false } })); return }
@@ -1107,9 +1101,9 @@ export function MyItemsModal({ userId, onClose, onChanged }: MyItemsProps) {
   }
 
   const saveJob = async (id: string) => {
-    const r = await fetch('/api/jobs', {
+    const r = await authFetch('/api/jobs', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, jobId: id, edits: editData }),
+      body: JSON.stringify({ jobId: id, edits: editData }),
     })
     const d = await r.json()
     if (d.error) { setMsgs(m => ({ ...m, [id]: { text: d.error, ok: false } })); return }
@@ -1117,9 +1111,9 @@ export function MyItemsModal({ userId, onClose, onChanged }: MyItemsProps) {
   }
 
   const deleteListing = async (id: string) => {
-    const r = await fetch('/api/listings', {
+    const r = await authFetch('/api/listings', {
       method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, listingId: id }),
+      body: JSON.stringify({ listingId: id }),
     })
     const d = await r.json()
     if (d.error) { setMsgs(m => ({ ...m, [id]: { text: d.error, ok: false } })); return }
@@ -1127,16 +1121,15 @@ export function MyItemsModal({ userId, onClose, onChanged }: MyItemsProps) {
   }
 
   const deleteJob = async (id: string) => {
-    const r = await fetch('/api/jobs', {
+    const r = await authFetch('/api/jobs', {
       method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, jobId: id }),
+      body: JSON.stringify({ jobId: id }),
     })
     const d = await r.json()
     if (d.error) { setMsgs(m => ({ ...m, [id]: { text: d.error, ok: false } })); return }
     setConfirmDel(null); onChanged(); reload()
   }
 
-  const fmtPrice = (p: number) => p >= 1e6 ? `$${(p/1e6).toFixed(2)}M` : `$${Math.round(p/1000)}K`
   const statusColor = (s: string) => s === 'approved' ? { bg: 'rgba(52,199,89,0.12)', c: '#248a3d', label: 'LIVE' }
     : s === 'rejected' ? { bg: 'rgba(255,59,48,0.08)', c: '#ff3b30', label: 'REJECTED' }
     : { bg: 'rgba(255,159,10,0.12)', c: '#b07800', label: 'PENDING' }
@@ -1199,7 +1192,7 @@ export function MyItemsModal({ userId, onClose, onChanged }: MyItemsProps) {
                     <div style={{ fontSize: 12, color: '#86868b', marginTop: 2 }}>{l.reg} · {l.hours?.toLocaleString()} h · {l.location}</div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-                    <div style={{ fontSize: 16, fontWeight: 700 }}>{fmtPrice(l.price)}</div>
+                    <div style={{ fontSize: 16, fontWeight: 700 }}>{fmtPrice(l.price, l.currency)}</div>
                     <div style={{ display: 'flex', gap: 6 }}>
                       {!isEditing && <button onClick={() => startEdit(l)} style={iBtn('#0a84ff', 'rgba(10,132,255,0.1)')}>✏ Edit</button>}
                       {confirmDel === l.id ? (
@@ -1217,12 +1210,29 @@ export function MyItemsModal({ userId, onClose, onChanged }: MyItemsProps) {
                 {isEditing && (
                   <div style={{ background: 'rgba(10,132,255,0.04)', borderRadius: 10, padding: 12 }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                      {[['Year', 'year', 'number'], ['Reg', 'reg', 'text'], ['Hours TT', 'hours', 'number'], ['Price (USD)', 'price', 'number']].map(([lb, k, type]) => (
+                      {[['Year', 'year', 'number'], ['Reg', 'reg', 'text'], ['Hours TT', 'hours', 'number'], ['Price', 'price', 'number']].map(([lb, k, type]) => (
                         <div key={k}>
                           <label style={editLbl}>{lb}</label>
                           <input style={editInp} type={type} value={editData[k] ?? ''} onChange={e => setEditData((d: any) => ({ ...d, [k]: e.target.value }))} />
                         </div>
                       ))}
+                      <div>
+                        <label style={editLbl}>Currency</label>
+                        <select style={editInp} value={editData.currency ?? 'USD'} onChange={e => setEditData((d: any) => ({ ...d, currency: e.target.value }))}>
+                          {CURRENCIES.map(c => <option key={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={editLbl}>Location</label>
+                        <AirportPicker
+                          initialLabel={editData.location ?? ''}
+                          hasValue={editData.lat != null && editData.lon != null}
+                          inputStyle={editInp}
+                          onChange={ap => setEditData((d: any) => ap
+                            ? { ...d, location: `${ap.icao} — ${ap.name}`, lat: ap.lat, lon: ap.lon }
+                            : { ...d, location: '', lat: null, lon: null })}
+                        />
+                      </div>
                       <div>
                         <label style={editLbl}>Contact email</label>
                         <input style={editInp} type="email" value={editData.contact_email ?? ''} onChange={e => setEditData((d: any) => ({ ...d, contact_email: e.target.value }))} />
@@ -1336,8 +1346,6 @@ export function ContactModal({ listing, user, onClose }: ContactProps) {
 
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
 
-  const fmtPrice = (p: number) => p >= 1e6 ? `$${(p/1e6).toFixed(2)}M` : `$${Math.round(p/1000)}K`
-
   const send = async () => {
     if (!name || !email) { setRes({ text: 'Name and email are required.', ok: false }); return }
     setLoading(true); setRes(null)
@@ -1382,7 +1390,7 @@ export function ContactModal({ listing, user, onClose }: ContactProps) {
               {listing.reg} · {listing.hours?.toLocaleString()} h · {listing.location}
             </div>
             <div style={{ fontSize: 16, fontWeight: 700, color: '#0a84ff', marginTop: 5 }}>
-              {fmtPrice(listing.price)}
+              {fmtPrice(listing.price, listing.currency)}
             </div>
           </div>
 

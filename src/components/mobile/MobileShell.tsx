@@ -8,6 +8,8 @@ import { AIRPORTS, lookupAirport } from '@/lib/airports'
 import type { Listing } from '@/lib/supabase'
 import type { AC } from '@/lib/aircraft'
 import { createClient } from '@/lib/supabase'
+import { authFetch } from '@/lib/authFetch'
+import AirportPicker, { type RemoteAirport } from '@/components/ui/AirportPicker'
 import MobileFiltersDrawer from './MobileFiltersDrawer'
 import MobileResultsSheet from './MobileResultsSheet'
 import MobileMarket from './MobileMarket'
@@ -28,6 +30,11 @@ for (const a of AIRPORTS) {
 }
 function resolveListingDots(listings: Listing[]) {
   return listings.flatMap(l => {
+    // Coordinates captured once from Supabase when the seller picked their
+    // airport at listing time — no re-resolution needed.
+    if (l.lat != null && l.lon != null) {
+      return [{ lon: l.lon, lat: l.lat, model: l.model ?? '', price: l.price ?? null, currency: l.currency ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id }]
+    }
     if (!l.location) return []
     const tokens = l.location.trim().toUpperCase().split(/[\s—\-,/]+/)
     for (const tok of tokens) {
@@ -35,11 +42,11 @@ function resolveListingDots(listings: Listing[]) {
         // Exact match first, then fuzzy fallback — airports.ts is hand-edited
         // and codes can be renamed/removed, silently dropping pins otherwise.
         const ap = _AIRPORT_COORDS[tok] ?? lookupAirport(tok)
-        if (ap) return [{ lon: ap.lon, lat: ap.lat, model: l.model ?? '', price: l.price ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id }]
+        if (ap) return [{ lon: ap.lon, lat: ap.lat, model: l.model ?? '', price: l.price ?? null, currency: l.currency ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id }]
       }
     }
     const byName = lookupAirport(l.location)
-    if (byName) return [{ lon: byName.lon, lat: byName.lat, model: l.model ?? '', price: l.price ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id }]
+    if (byName) return [{ lon: byName.lon, lat: byName.lat, model: l.model ?? '', price: l.price ?? null, currency: l.currency ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id }]
     return []
   })
 }
@@ -72,6 +79,7 @@ export interface MobileShellProps {
   showWind: boolean
   listings: Listing[]
   onHomeAP: (code: string) => void
+  onHomeAirportSelect: (ap: RemoteAirport | null) => void
   onRoutCalc: (from: string, to: string) => { from: APEntry | null; to: APEntry | null }
   onFind: () => void
   openOffers: (ac: (typeof AC)[0]) => void
@@ -91,7 +99,7 @@ export default function MobileShell(props: MobileShellProps) {
     onSelectAC, windLevel,
     results, contactListing, setContactListing,
     user, setUser, windBR, windUV, showWind,
-    listings, onHomeAP, onRoutCalc, onFind, openOffers, openContact,
+    listings, onHomeAP, onHomeAirportSelect, onRoutCalc, onFind, openOffers, openContact,
     onWindToggle, onWindFetch, refreshListings,
     reachableAirports, allAirports,
   } = props
@@ -101,7 +109,6 @@ export default function MobileShell(props: MobileShellProps) {
   const [filtersOpen,    setFiltersOpen]    = useState(false)
   const [resultsOpen,    setResultsOpen]    = useState(false)
   const [pendingCount,   setPendingCount]   = useState(0)
-  const [apVal,          setApVal]          = useState('')
   const [authMessage,    setAuthMessage]    = useState<string | undefined>(undefined)
   const [messageListing, setMessageListing] = useState<MessageListing | null>(null)
   const [messagesOpen,   setMessagesOpen]   = useState(false)
@@ -161,7 +168,7 @@ export default function MobileShell(props: MobileShellProps) {
   // Fetch pending count for admin badge
   useEffect(() => {
     if (user?.role !== 'admin') return
-    fetch('/api/admin').then(r => r.json()).then(d => {
+    authFetch('/api/admin').then(r => r.json()).then(d => {
       if (d.listings && d.jobs) setPendingCount(d.listings.length + d.jobs.length)
     }).catch(() => {})
   }, [user])
@@ -261,27 +268,25 @@ export default function MobileShell(props: MobileShellProps) {
       {activeTab === 'globe' && (
         <>
           {/* Home airport input — top left under header */}
-          <div style={{ position: 'fixed', top: HDR_H + 28, left: '4%', zIndex: 110 }}>
+          <div style={{ position: 'fixed', top: HDR_H + 28, left: '4%', zIndex: 110, width: 210 }}>
             <div style={{ position: 'relative' }}>
-              <input
-                value={apVal}
+              <AirportPicker
                 placeholder="Home airport"
-                maxLength={20}
-                onChange={e => {
-                  const v = e.target.value.toUpperCase()
-                  setApVal(v)
-                  if (v.length >= 3) onHomeAP(v)
-                }}
-                style={{
-                  width: 180, height: 38, padding: '0 14px',
+                initialLabel={homeAp ? `${homeAp.icao} — ${homeAp.name}` : ''}
+                hasValue={!!homeAp}
+                onChange={onHomeAirportSelect}
+                selectedBackground="rgba(10,132,255,0.18)"
+                selectedColor="#0a84ff"
+                inputStyle={{
+                  width: '100%', height: 38, padding: '0 30px 0 14px',
                   borderRadius: 17, border: 'none',
-                  background: homeAp ? 'rgba(10,132,255,0.18)' : 'rgba(255,255,255,0.22)',
+                  background: 'rgba(255,255,255,0.22)',
                   backdropFilter: 'blur(12px)',
-                  color: homeAp ? '#0a84ff' : 'rgba(255,255,255,0.85)',
-                  fontSize: 16, fontWeight: 600, fontFamily: 'inherit',
-                  textTransform: 'uppercase', letterSpacing: '0.06em',
+                  color: 'rgba(255,255,255,0.85)',
+                  fontSize: 14, fontWeight: 600, fontFamily: 'inherit',
                   outline: 'none',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                  boxSizing: 'border-box',
                 }}
               />
               {!homeAp && (

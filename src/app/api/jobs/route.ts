@@ -1,6 +1,7 @@
 // src/app/api/jobs/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
+import { getVerifiedUserId } from '@/lib/auth-server'
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
 
 export async function GET() {
@@ -77,9 +78,15 @@ export async function POST(req: NextRequest) {
 // PATCH /api/jobs — owner edits their own job posting (any status)
 export async function PATCH(req: NextRequest) {
   try {
+    const userId = await getVerifiedUserId(req)
+    if (!userId) return NextResponse.json({ error: 'Not authorized' }, { status: 401 })
+    if (!(await checkRateLimit(`jobs-patch:${userId}`, 20, 600))) {
+      return NextResponse.json({ error: 'Too many requests — please try again later.' }, { status: 429 })
+    }
+
     const body = await req.json()
-    const { userId, jobId, edits } = body
-    if (!userId || !jobId || !edits) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+    const { jobId, edits } = body
+    if (!jobId || !edits) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
 
     const supabase = createServerClient()
     const { data: existing } = await supabase.from('jobs').select('poster_id').eq('id', jobId).single()
@@ -124,9 +131,15 @@ export async function PATCH(req: NextRequest) {
 // DELETE /api/jobs — owner deletes their own job posting
 export async function DELETE(req: NextRequest) {
   try {
+    const userId = await getVerifiedUserId(req)
+    if (!userId) return NextResponse.json({ error: 'Not authorized' }, { status: 401 })
+    if (!(await checkRateLimit(`jobs-delete:${userId}`, 20, 600))) {
+      return NextResponse.json({ error: 'Too many requests — please try again later.' }, { status: 429 })
+    }
+
     const body = await req.json()
-    const { userId, jobId } = body
-    if (!userId || !jobId) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+    const { jobId } = body
+    if (!jobId) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
 
     const supabase = createServerClient()
     const { data: existing } = await supabase.from('jobs').select('poster_id').eq('id', jobId).single()

@@ -3,12 +3,14 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import type { Message } from './MessageModal'
+import { fmtPrice } from '@/lib/currency'
 
 type Conversation = {
   listingId: string
   model: string
   year: number
   price: number | null
+  currency: string | null
   seller_id: string | null
   lastMessage: string
   lastAt: string
@@ -18,12 +20,7 @@ type Conversation = {
 type Props = {
   userId: string
   onClose: () => void
-  onOpenConversation: (l: { id: string; model: string; year: number; price: number | null; seller_id: string | null }) => void
-}
-
-function fmtPrice(p: number | null): string {
-  if (!p) return '—'
-  return p >= 1_000_000 ? `$${(p / 1_000_000).toFixed(1)}M` : `$${Math.round(p / 1000)}K`
+  onOpenConversation: (l: { id: string; model: string; year: number; price: number | null; currency?: string | null; seller_id: string | null }) => void
 }
 
 export default function MessagesPanel({ userId, onClose, onOpenConversation }: Props) {
@@ -53,7 +50,7 @@ export default function MessagesPanel({ userId, onClose, onOpenConversation }: P
 
       const ids = Array.from(byListing.keys())
       const { data: listingRows } = await supabase
-        .from('listings').select('id,model,year,price,seller_id').in('id', ids)
+        .from('listings').select('id,model,year,price,currency,seller_id').in('id', ids)
       const listingMap = new Map((listingRows ?? []).map((l: any) => [l.id, l]))
 
       const convs: Conversation[] = ids.map(id => {
@@ -66,6 +63,7 @@ export default function MessagesPanel({ userId, onClose, onOpenConversation }: P
           model: l?.model ?? 'Aircraft',
           year: l?.year ?? 0,
           price: l?.price ?? null,
+          currency: l?.currency ?? null,
           seller_id: l?.seller_id ?? null,
           lastMessage: last.content,
           lastAt: last.created_at,
@@ -120,7 +118,7 @@ export default function MessagesPanel({ userId, onClose, onOpenConversation }: P
 
           {conversations.map(c => (
             <div key={c.listingId}
-              onClick={() => onOpenConversation({ id: c.listingId, model: c.model, year: c.year, price: c.price, seller_id: c.seller_id })}
+              onClick={() => onOpenConversation({ id: c.listingId, model: c.model, year: c.year, price: c.price, currency: c.currency, seller_id: c.seller_id })}
               style={{
                 padding: '12px 12px', borderRadius: 12, cursor: 'pointer',
                 marginBottom: 4, transition: 'background 0.15s',
@@ -143,7 +141,7 @@ export default function MessagesPanel({ userId, onClose, onOpenConversation }: P
               <div style={{ fontSize: 12, color: '#86868b', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {c.lastMessage}
               </div>
-              <div style={{ fontSize: 11, color: '#0a84ff', fontWeight: 600 }}>{fmtPrice(c.price)}</div>
+              <div style={{ fontSize: 11, color: '#0a84ff', fontWeight: 600 }}>{fmtPrice(c.price, c.currency)}</div>
             </div>
           ))}
         </div>

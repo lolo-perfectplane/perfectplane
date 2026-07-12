@@ -1,13 +1,10 @@
 'use client'
 // src/components/ui/FavoritesTab.tsx
 import { useEffect, useMemo, useState } from 'react'
+import Image from 'next/image'
 import type { Listing } from '@/lib/supabase'
 import FavoriteButton from './FavoriteButton'
-
-function fmtPrice(usd: number | null | undefined): string {
-  if (!usd) return '—'
-  return usd >= 1_000_000 ? `$${(usd / 1_000_000).toFixed(1)}M` : `$${Math.round(usd / 1000)}K`
-}
+import { fmtPrice } from '@/lib/currency'
 
 type Props = {
   listings: Listing[]
@@ -68,11 +65,11 @@ export default function FavoritesTab({ listings: initialListings, favoriteIds, o
                     onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none' }}>
                     <div style={{ width: '100%', aspectRatio: '4/3', background: 'rgba(118,118,128,0.08)', position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
                       {photos.length > 0
-                        ? <img src={photos[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        ? <Image src={photos[0]} alt="" fill sizes="(max-width: 700px) 50vw, 320px" style={{ objectFit: 'cover' }} />
                         : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, color: 'rgba(0,0,0,0.12)' }}>✈</div>
                       }
                       <div style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', color: '#fff', fontSize: 12, fontWeight: 700, padding: '3px 8px', borderRadius: 7 }}>
-                        {fmtPrice(l.price)}
+                        {fmtPrice(l.price, l.currency)}
                       </div>
                       <FavoriteButton active onToggle={() => onToggleFavorite(l.id)} size={28} style={{ position: 'absolute', top: 8, left: 8 }} />
                     </div>

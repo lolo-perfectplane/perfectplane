@@ -1,8 +1,10 @@
 'use client'
 // src/components/listings/OffersModal.tsx
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import type { Listing } from '@/lib/supabase'
 import type { AC } from '@/lib/aircraft'
+import { fmtPrice } from '@/lib/currency'
 
 type Props = {
   ac: typeof AC[0]
@@ -11,7 +13,9 @@ type Props = {
   onContact: (l: Listing) => void
 }
 
-function fmtUSD(n: number) { return n >= 1e6 ? `$${(n/1e6).toFixed(2)}M` : `$${Math.round(n/1000)}K` }
+// AI-generated mock listings are always denominated in USD (the prompt
+// fixes this) — only the real Supabase community listings carry a currency.
+function fmtUSD(n: number | null) { return n == null ? 'On enquiry' : n >= 1e6 ? `$${(n/1e6).toFixed(2)}M` : `$${Math.round(n/1000)}K` }
 
 function tapURL(name: string) {
   const c = name.replace(/[()]/g,'').replace(/\s+/g,' ').trim()
@@ -80,21 +84,21 @@ export function OffersModal({ ac, communityListings, onClose, onContact }: Props
                   return (
                     <div key={l.id} style={{ background: 'rgba(57,255,143,.03)', border: '1px solid rgba(57,255,143,.16)', borderRadius: 2, overflow: 'hidden' }}>
                       {cover && (
-                        <div style={{ width: '100%', aspectRatio: '16/9', overflow: 'hidden' }}>
-                          <img src={cover} alt={l.model} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        <div style={{ width: '100%', aspectRatio: '16/9', overflow: 'hidden', position: 'relative' }}>
+                          <Image src={cover} alt={l.model} fill sizes="220px" style={{ objectFit: 'cover' }} />
                         </div>
                       )}
                       <div style={{ padding: 10 }}>
                         <div style={{ fontFamily: 'var(--font-orbitron)', fontSize: '.72rem', color: '#fff', marginBottom: 4 }}>{l.year} {l.model}</div>
                         <div style={{ fontSize: '.70rem', color: '#4a6fa8' }}>{l.reg} · {l.hours.toLocaleString()} h</div>
                         <div style={{ fontSize: '.70rem', color: '#4a6fa8' }}>{l.location}</div>
-                        <div style={{ fontFamily: 'var(--font-orbitron)', fontSize: '.76rem', color: '#ffb800', marginTop: 4 }}>{fmtUSD(l.price)}</div>
+                        <div style={{ fontFamily: 'var(--font-orbitron)', fontSize: '.76rem', color: '#ffb800', marginTop: 4 }}>{fmtPrice(l.price, l.currency)}</div>
                         <div style={{ fontSize: '.66rem', color: '#4a6fa8', marginTop: 2 }}>{l.seller_name}</div>
                         {l.photos && l.photos.length > 1 && (
                           <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
                             {(l.photos as string[]).slice(1).map((p, i) => p && (
-                              <div key={i} style={{ width: 44, height: 33, borderRadius: 2, overflow: 'hidden', border: '1px solid rgba(57,255,143,.2)' }}>
-                                <img src={p} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              <div key={i} style={{ position: 'relative', width: 44, height: 33, borderRadius: 2, overflow: 'hidden', border: '1px solid rgba(57,255,143,.2)' }}>
+                                <Image src={p} alt="" fill sizes="44px" style={{ objectFit: 'cover' }} />
                               </div>
                             ))}
                           </div>

@@ -1,16 +1,11 @@
 'use client'
 // src/components/mobile/MobileFavorites.tsx
 import { useEffect, useMemo, useState } from 'react'
+import Image from 'next/image'
 import type { Listing } from '@/lib/supabase'
 import { createClient } from '@/lib/supabase'
 import FavoriteButton from '@/components/ui/FavoriteButton'
-
-function fmtPrice(p: number | null) {
-  if (!p) return 'POA'
-  if (p >= 1_000_000) return `$${(p / 1_000_000).toFixed(1)}M`
-  if (p >= 1_000)     return `$${(p / 1_000).toFixed(0)}K`
-  return `$${p}`
-}
+import { fmtPrice } from '@/lib/currency'
 
 type Props = {
   listings: Listing[]
@@ -76,10 +71,10 @@ export default function MobileFavorites({ listings: initialListings, favoriteIds
                   style={{ borderRadius: 14, overflow: 'hidden', background: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,0.07)', cursor: 'pointer', border: '0.5px solid rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ width: '100%', aspectRatio: '4/3', background: 'rgba(118,118,128,0.08)', position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
                     {photos.length > 0
-                      ? <img src={photos[0]} alt={l.model ?? ''} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                      ? <Image src={photos[0]} alt={l.model ?? ''} fill sizes="(max-width: 500px) 50vw, 280px" style={{ objectFit: 'cover' }} />
                       : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, color: 'rgba(0,0,0,0.12)' }}>✈</div>
                     }
-                    <div style={{ position: 'absolute', top: 7, right: 7, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 6 }}>{fmtPrice(l.price ?? null)}</div>
+                    <div style={{ position: 'absolute', top: 7, right: 7, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 6 }}>{fmtPrice(l.price ?? null, l.currency)}</div>
                     <FavoriteButton active onToggle={() => onToggleFavorite(l.id)} size={26} style={{ position: 'absolute', top: 7, left: 7 }} />
                   </div>
                   <div style={{ padding: '9px 10px 11px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

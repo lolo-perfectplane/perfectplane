@@ -2,6 +2,7 @@
 // src/components/globe/GlobeMap.tsx
 import { useEffect, useRef } from 'react'
 import mapboxgl from 'mapbox-gl'
+import { fmtPrice } from '@/lib/currency'
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!
 
@@ -10,7 +11,7 @@ type WindPoint = { lat: number; lon: number; u: number; v: number; spd: number }
 type WindUV   = WindPoint[] | null
 
 type ListingDot = {
-  lon: number; lat: number; model: string; price: number | null
+  lon: number; lat: number; model: string; price: number | null; currency?: string | null
   condition?: string | null; reg?: string; location?: string; listingId?: string
 }
 
@@ -23,17 +24,12 @@ const CONDITION_COLORS: Record<string, string> = {
 }
 const DEFAULT_CONDITION_COLOR = 'rgba(255,255,255,0.4)'
 
-function fmtListingPrice(price: number | null): string {
-  if (price == null) return ''
-  return price >= 1_000_000 ? `$${(price / 1_000_000).toFixed(1)}M` : `$${Math.round(price / 1000)}K`
-}
-
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
 }
 
 function listingPopupHTML(
-  props: { model?: string; price?: number | null; condition?: string | null; reg?: string; location?: string; listingId?: string },
+  props: { model?: string; price?: number | null; currency?: string | null; condition?: string | null; reg?: string; location?: string; listingId?: string },
   uid: string,
 ): string {
   const color   = (props.condition && CONDITION_COLORS[props.condition]) || DEFAULT_CONDITION_COLOR
@@ -48,7 +44,7 @@ function listingPopupHTML(
   return `
     <div style="position:relative;background:rgba(30,35,45,0.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:0.5px solid rgba(255,255,255,0.12);border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,0.4);padding:14px 16px;min-width:200px;font-family:'Inter',-apple-system,sans-serif;">
       <div style="font-size:20px;font-weight:700;color:rgba(255,255,255,0.95);letter-spacing:-0.02em;padding-right:26px;">${escapeHtml(props.model ?? '')}</div>
-      <div style="font-size:14px;color:rgba(255,255,255,0.5);margin-top:4px;">${fmtListingPrice(props.price ?? null)}</div>
+      <div style="font-size:14px;color:rgba(255,255,255,0.5);margin-top:4px;">${escapeHtml(fmtPrice(props.price ?? null, props.currency))}</div>
       <div class="pp-info-badge" title="Condition: ${condStr}"
         onclick="event.stopPropagation();var d=document.getElementById('${detailsId}');d.style.display=d.style.display==='none'?'block':'none';"
         style="position:absolute;top:12px;right:12px;width:28px;height:28px;border-radius:50%;border:1.5px solid ${color};color:${color};display:flex;align-items:center;justify-content:center;font-size:14px;line-height:1;cursor:pointer;">ⓘ</div>
@@ -235,6 +231,7 @@ function dotsToGeoJSON(dots: ListingDot[]): GeoJSON.FeatureCollection {
         properties: {
           model: dot.model,
           price: dot.price,
+          currency: dot.currency ?? null,
           condition: dot.condition ?? null,
           reg: dot.reg ?? '',
           location: dot.location ?? '',
@@ -418,7 +415,7 @@ export default function GlobeMap({
         const feature = e.features?.[0]
         if (!feature || feature.geometry.type !== 'Point') return
         const coords = feature.geometry.coordinates.slice() as [number, number]
-        const props  = feature.properties as { model?: string; price?: number | null; condition?: string | null; reg?: string; location?: string; listingId?: string }
+        const props  = feature.properties as { model?: string; price?: number | null; currency?: string | null; condition?: string | null; reg?: string; location?: string; listingId?: string }
         const uid    = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`
 
         listingPopupRef.current?.remove()

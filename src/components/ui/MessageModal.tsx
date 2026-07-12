@@ -2,6 +2,7 @@
 // src/components/ui/MessageModal.tsx
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
+import { fmtPrice } from '@/lib/currency'
 
 export type Message = {
   id: string
@@ -18,6 +19,7 @@ export type MessageListing = {
   model: string
   year: number
   price: number | null
+  currency?: string | null
   seller_id: string | null
 }
 
@@ -25,11 +27,6 @@ type Props = {
   listing: MessageListing
   buyerId: string
   onClose: () => void
-}
-
-function fmtPrice(p: number | null): string {
-  if (!p) return '—'
-  return p >= 1_000_000 ? `$${(p / 1_000_000).toFixed(1)}M` : `$${Math.round(p / 1000)}K`
 }
 
 function fmtTime(iso: string): string {
@@ -127,7 +124,7 @@ export default function MessageModal({ listing, buyerId, onClose }: Props) {
               {listing.year} {listing.model}
             </div>
             <div style={{ fontSize: 13, color: '#0a84ff', fontWeight: 600, marginTop: 2 }}>
-              {fmtPrice(listing.price)}
+              {fmtPrice(listing.price, listing.currency)}
             </div>
           </div>
           <button onClick={onClose} style={{

@@ -1,6 +1,7 @@
 'use client'
 // src/components/mobile/MobileJobsView.tsx
 import { useState, useEffect, useRef, useMemo } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
 import type { Job } from '@/components/ui/JobTab'
 import { PostJobModal } from '@/components/ui/JobTab'
@@ -186,9 +187,9 @@ function JobDetailSheet({ job, user, onClose, onApply }: { job: Job; user: User 
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px 8px' }}>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 10 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, border: '0.5px solid rgba(0,0,0,0.08)', background: 'rgba(118,118,128,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+            <div style={{ position: 'relative', width: 48, height: 48, borderRadius: 12, border: '0.5px solid rgba(0,0,0,0.08)', background: 'rgba(118,118,128,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
               {job.logo_url
-                ? <img src={job.logo_url} alt={job.company} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 6 }} />
+                ? <Image src={job.logo_url} alt={job.company} fill sizes="48px" style={{ objectFit: 'contain', padding: 6 }} />
                 : <span style={{ fontSize: 22, opacity: 0.3 }}>🏢</span>
               }
             </div>
@@ -382,9 +383,9 @@ export default function MobileJobsView({ user, onAuthClick, TAB_H, HDR_H }: {
                 style={{ background: '#fff', borderRadius: 16, border: '0.5px solid rgba(0,0,0,0.06)', padding: '14px 14px 12px', marginBottom: 10, cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
                 <div style={{ display: 'flex', gap: 10, marginBottom: 7, alignItems: 'flex-start' }}>
                   {/* Logo */}
-                  <div style={{ width: 40, height: 40, borderRadius: 10, border: '0.5px solid rgba(0,0,0,0.08)', background: 'rgba(118,118,128,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                  <div style={{ position: 'relative', width: 40, height: 40, borderRadius: 10, border: '0.5px solid rgba(0,0,0,0.08)', background: 'rgba(118,118,128,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
                     {j.logo_url
-                      ? <img src={j.logo_url} alt={j.company} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }} />
+                      ? <Image src={j.logo_url} alt={j.company} fill sizes="40px" style={{ objectFit: 'contain', padding: 4 }} />
                       : <span style={{ fontSize: 18, opacity: 0.3 }}>🏢</span>
                     }
                   </div>

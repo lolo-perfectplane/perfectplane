@@ -1,17 +1,19 @@
 // src/app/api/admin/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
+import { getVerifiedUserId } from '@/lib/auth-server'
 import { sendListingApproved, sendListingRejected } from '@/lib/email'
+import { checkRateLimit } from '@/lib/rateLimit'
+import { CURRENCIES } from '@/lib/currency'
 
 async function assertAdmin(supabase: ReturnType<typeof createServerClient>, userId: string) {
   const { data } = await supabase.from('profiles').select('role').eq('id', userId).single()
   if (data?.role !== 'admin') throw new Error('Not authorized')
 }
 
-// GET /api/admin?userId=xxx — fetch all pending listings and jobs
+// GET /api/admin — fetch all pending listings and jobs (admin only)
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url)
-  const userId = searchParams.get('userId')
+  const userId = await getVerifiedUserId(req)
   if (!userId) return NextResponse.json({ error: 'Not authorized' }, { status: 401 })
 
   const supabase = createServerClient()
@@ -30,10 +32,16 @@ export async function GET(req: NextRequest) {
 // PATCH /api/admin — approve, reject, or edit an item
 export async function PATCH(req: NextRequest) {
   try {
-    const body = await req.json()
-    const { userId, listingId, action, edits, grantCertification, kind = 'listing' } = body
+    const userId = await getVerifiedUserId(req)
+    if (!userId) return NextResponse.json({ error: 'Not authorized' }, { status: 401 })
+    if (!(await checkRateLimit(`admin-patch:${userId}`, 60, 600))) {
+      return NextResponse.json({ error: 'Too many requests — please try again later.' }, { status: 429 })
+    }
 
-    if (!userId || !listingId || !action) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+    const body = await req.json()
+    const { listingId, action, edits, grantCertification, kind = 'listing' } = body
+
+    if (!listingId || !action) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
     if (!['approve', 'reject', 'edit'].includes(action)) return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 
     const supabase = createServerClient()
@@ -74,7 +82,10 @@ export async function PATCH(req: NextRequest) {
         reg:           edits.reg?.toUpperCase(),
         hours:         Number(edits.hours) || undefined,
         price:         Number(edits.price) || undefined,
+        currency:      CURRENCIES.includes(edits.currency) ? edits.currency : undefined,
         location:      edits.location,
+        lat:           typeof edits.lat === 'number' ? edits.lat : null,
+        lon:           typeof edits.lon === 'number' ? edits.lon : null,
         equip:         edits.equip    || null,
         condition:     edits.condition,
         type_rating:   !!edits.type_rating,
@@ -103,7 +114,7 @@ export async function PATCH(req: NextRequest) {
         .eq('id', listingId).eq('status', 'pending').select().single()
       if (error) throw error
       if (!data) return NextResponse.json({ error: 'Listing not found or already processed' }, { status: 404 })
-      sendListingApproved({ model: data.model, year: data.year, price: data.price, typeRating: data.type_rating, sellerName: data.seller_name, sellerEmail: data.contact_email })
+      sendListingApproved({ model: data.model, year: data.year, price: data.price, currency: data.currency, typeRating: data.type_rating, sellerName: data.seller_name, sellerEmail: data.contact_email })
         .catch(e => console.error('[email] sendListingApproved failed:', e))
       return NextResponse.json({ listing: data })
     }
@@ -126,9 +137,15 @@ export async function PATCH(req: NextRequest) {
 // DELETE /api/admin — permanently delete a listing or job
 export async function DELETE(req: NextRequest) {
   try {
+    const userId = await getVerifiedUserId(req)
+    if (!userId) return NextResponse.json({ error: 'Not authorized' }, { status: 401 })
+    if (!(await checkRateLimit(`admin-delete:${userId}`, 60, 600))) {
+      return NextResponse.json({ error: 'Too many requests — please try again later.' }, { status: 429 })
+    }
+
     const body = await req.json()
-    const { userId, listingId, kind = 'listing' } = body
-    if (!userId || !listingId) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+    const { listingId, kind = 'listing' } = body
+    if (!listingId) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
 
     const supabase = createServerClient()
     await assertAdmin(supabase, userId)

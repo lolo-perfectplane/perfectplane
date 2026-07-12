@@ -5,6 +5,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { AC, scoreAircraft } from '@/lib/aircraft'
 import { AIRPORTS, lookupAirport } from '@/lib/airports'
 import type { APEntry } from '@/lib/airports'
+import { toAPEntry, type RemoteAirport } from '@/lib/airports-remote'
 import type { Listing } from '@/lib/supabase'
 import { createClient } from '@/lib/supabase'
 import Header from './ui/Header'
@@ -127,6 +128,12 @@ for (const a of AIRPORTS) {
 
 function resolveListingDots(listings: import('@/lib/supabase').Listing[]) {
   const dots = listings.flatMap(l => {
+    // Coordinates captured once from Supabase when the seller picked their
+    // airport at listing time — no re-resolution needed, and no fragility
+    // from parsing the free-text location string.
+    if (l.lat != null && l.lon != null) {
+      return [{ lon: l.lon, lat: l.lat, model: l.model ?? '', price: l.price ?? null, currency: l.currency ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id }]
+    }
     if (!l.location) return []
     const tokens = l.location.trim().toUpperCase().split(/[\s—\-,/]+/)
     for (const tok of tokens) {
@@ -135,12 +142,12 @@ function resolveListingDots(listings: import('@/lib/supabase').Listing[]) {
         // fuzzy matching — airports.ts is hand-edited and codes can be
         // renamed/removed, so a strict dictionary lookup silently drops pins.
         const ap = AIRPORT_COORDS[tok] ?? lookupAirport(tok)
-        if (ap) return [{ lon: ap.lon, lat: ap.lat, model: l.model ?? '', price: l.price ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id }]
+        if (ap) return [{ lon: ap.lon, lat: ap.lat, model: l.model ?? '', price: l.price ?? null, currency: l.currency ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id }]
       }
     }
     // Last resort: try resolving the full location string (handles names/formats that don't tokenize cleanly)
     const byName = lookupAirport(l.location)
-    if (byName) return [{ lon: byName.lon, lat: byName.lat, model: l.model ?? '', price: l.price ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id }]
+    if (byName) return [{ lon: byName.lon, lat: byName.lat, model: l.model ?? '', price: l.price ?? null, currency: l.currency ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id }]
     return []
   })
   console.log('[AppShell] resolveListingDots — listings:', listings.length, 'resolved:', dots.length, listings.map(l => l.location))
@@ -350,6 +357,7 @@ export default function AppShell({ initialListings }: { initialListings: Listing
   }
 
   const handleHomeAP = (code: string) => setHomeAp(lookupAirport(code))
+  const handleHomeAirportSelect = (ap: RemoteAirport | null) => setHomeAp(ap ? toAPEntry(ap) : null)
 
   const handleRoutCalc = (from: string, to: string) => {
     const f = lookupAirport(from)
@@ -377,6 +385,7 @@ export default function AppShell({ initialListings }: { initialListings: Listing
         windBR={windBR} windUV={windUV} showWind={showWind}
         listings={listings}
         onHomeAP={handleHomeAP}
+        onHomeAirportSelect={handleHomeAirportSelect}
         onRoutCalc={handleRoutCalc}
         onFind={handleFind}
         openOffers={openOffers}
@@ -442,6 +451,7 @@ export default function AppShell({ initialListings }: { initialListings: Listing
             params={params}
             onChange={setParams}
             onHomeAP={handleHomeAP}
+            onHomeAirportSelect={handleHomeAirportSelect}
             onRoutCalc={handleRoutCalc}
             onFind={handleFind}
             homeAp={homeAp}
