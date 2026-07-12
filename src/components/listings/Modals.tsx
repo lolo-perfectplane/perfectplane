@@ -241,11 +241,11 @@ export function SellModal({ user, onClose, onSuccess }: SellProps) {
 
           {/* Total Time + Price */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-              <label style={lbl}>Total airframe time (hrs)</label>
+            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
+              <label style={lbl}>Total time (hrs)</label>
               <input style={inp} type="number" value={hours} onChange={e => setHours(e.target.value)} placeholder="1250" />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
               <label style={lbl}>Asking price</label>
               {priceOnEnquiry
                 ? <div style={{ ...inp, display: 'flex', alignItems: 'center', color: '#86868b', fontWeight: 500 }}>On enquiry</div>

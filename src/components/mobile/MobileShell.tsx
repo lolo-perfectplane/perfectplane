@@ -214,6 +214,10 @@ export default function MobileShell(props: MobileShellProps) {
         <span style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.03em', color: '#1d1d1f' }}>Perfect<span style={{ color: '#0a84ff' }}>Plane</span></span>
         {user ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={() => openModal('sell')} title="Free listing"
+              style={{ width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'rgba(10,132,255,0.1)', color: '#0a84ff', fontSize: 18, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, padding: 0 }}>
+              <span style={{ transform: 'translateY(-1.5px)' }}>+</span>
+            </button>
             <button onClick={() => setFavoritesOpen(true)} title="Favorites"
               style={{ width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'rgba(118,118,128,0.1)', color: '#4b5563', fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               ♡
@@ -236,10 +240,16 @@ export default function MobileShell(props: MobileShellProps) {
             </button>
           </div>
         ) : (
-          <button onClick={() => openModal('auth')}
-            style={{ height: 32, padding: '0 14px', borderRadius: 100, border: 'none', background: '#0a84ff', color: '#fff', fontSize: 16, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}>
-            Sign In
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={() => requestAuth('Sign in to list your aircraft for free')} title="Free listing"
+              style={{ width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'rgba(10,132,255,0.1)', color: '#0a84ff', fontSize: 18, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, padding: 0 }}>
+              <span style={{ transform: 'translateY(-1.5px)' }}>+</span>
+            </button>
+            <button onClick={() => openModal('auth')}
+              style={{ height: 32, padding: '0 14px', borderRadius: 100, border: 'none', background: '#0a84ff', color: '#fff', fontSize: 16, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}>
+              Sign In
+            </button>
+          </div>
         )}
       </div>
 
@@ -268,7 +278,7 @@ export default function MobileShell(props: MobileShellProps) {
       {activeTab === 'globe' && (
         <>
           {/* Home airport input — top left under header */}
-          <div style={{ position: 'fixed', top: HDR_H + 28, left: '4%', zIndex: 110, width: 210 }}>
+          <div style={{ position: 'fixed', top: HDR_H + 28, left: '4%', zIndex: 110, width: 168 }}>
             <div style={{ position: 'relative' }}>
               <AirportPicker
                 placeholder="Home airport"
@@ -300,13 +310,13 @@ export default function MobileShell(props: MobileShellProps) {
             onClick={() => { const next = !showWind; onWindToggle(next); if (next) onWindFetch() }}
             style={{
               position: 'fixed', top: HDR_H + 28, right: '4%', zIndex: 110,
-              height: 34, padding: '0 14px',
+              width: 168, height: 38, padding: '0 14px', boxSizing: 'border-box',
               borderRadius: 17, border: 'none',
               background: showWind ? 'rgba(52,199,89,0.22)' : 'rgba(255,255,255,0.22)',
               backdropFilter: 'blur(16px) saturate(180%)',
               color: showWind ? '#34c759' : '#ffffff',
               fontSize: 16, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 6,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
             }}
           >
