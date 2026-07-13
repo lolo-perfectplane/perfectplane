@@ -245,7 +245,6 @@ function dotsToGeoJSON(dots: ListingDot[]): GeoJSON.FeatureCollection {
 
 function applyDots(map: mapboxgl.Map, dots: ListingDot[]) {
   const src = map.getSource('listings') as mapboxgl.GeoJSONSource | undefined
-  console.log('[Globe] applyDots — dots:', dots.length, 'source found:', !!src)
   if (src) src.setData(dotsToGeoJSON(dots))
 }
 
@@ -573,7 +572,6 @@ export default function GlobeMap({
 
   // ── Listing offer dots ─────────────────────────────────────
   useEffect(() => {
-    console.log('[Globe] listingDots effect — count:', listingDots.length, 'mapReady:', styleReadyRef.current)
     latestDotsRef.current = listingDots
     if (mapRef.current && styleReadyRef.current) {
       applyDots(mapRef.current, listingDots)

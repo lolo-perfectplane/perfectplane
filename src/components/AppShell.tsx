@@ -150,7 +150,6 @@ function resolveListingDots(listings: import('@/lib/supabase').Listing[]) {
     if (byName) return [{ lon: byName.lon, lat: byName.lat, model: l.model ?? '', price: l.price ?? null, currency: l.currency ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id }]
     return []
   })
-  console.log('[AppShell] resolveListingDots — listings:', listings.length, 'resolved:', dots.length, listings.map(l => l.location))
   return dots
 }
 
@@ -209,6 +208,34 @@ export default function AppShell({ initialListings }: { initialListings: Listing
 
   const requestAuth = (message?: string) => { setAuthMessage(message); setModal('auth') }
   const handleSeeOffer = (listingId: string) => { setOpenListingId(listingId); setTab('market') }
+
+  // Restore the signed-in user from Supabase's persisted session on load —
+  // the session itself already survives reloads (localStorage, ~1 week,
+  // auto-refreshed), this just rehydrates our own `user` state from it so
+  // the UI doesn't show "signed out" while a valid session still exists.
+  useEffect(() => {
+    const supabase = createClient()
+
+    const hydrateFromSession = async (sessionUser: { id: string; email?: string }) => {
+      const { data: prof } = await supabase.from('profiles').select('name, role').eq('id', sessionUser.id).single()
+      setUser({
+        id: sessionUser.id,
+        name: prof?.name ?? sessionUser.email?.split('@')[0] ?? 'User',
+        email: sessionUser.email ?? '',
+        role: prof?.role ?? 'user',
+      })
+    }
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) hydrateFromSession(session.user)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') { setUser(null); return }
+      if (event === 'SIGNED_IN' && session?.user) hydrateFromSession(session.user)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
 
   const fetchUnread = useCallback(async () => {
     if (!user) { setUnreadCount(0); return }
@@ -348,6 +375,13 @@ export default function AppShell({ initialListings }: { initialListings: Listing
     const { data } = await supabase.from('listings').select('*').eq('status', 'approved')
     if (data) setListings(data as Listing[])
   }
+
+  // The server-rendered initialListings snapshot has been observed to lag
+  // behind the true approved count on first paint (globe showing some but
+  // not all offer dots until any client-side refresh runs). Re-fetch once
+  // client-side right after mount as a safety net, the same defensive
+  // pattern MarketTab already uses for its own listings.
+  useEffect(() => { refreshListings() }, []) // eslint-disable-line
 
   const handleSignOut = async () => {
     const supabase = createClient()

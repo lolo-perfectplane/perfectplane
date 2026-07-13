@@ -4,7 +4,17 @@ import { fmtPriceFull } from './currency'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const ADMIN = process.env.ADMIN_EMAIL!
-const FROM  = 'PerfectPlane <noreply@perfectplane.com>'
+const FROM  = 'PerfectPlane <noreply@perfectplane.eu>'
+
+// resend.emails.send() does NOT throw on API-level failures (unverified
+// sending domain, invalid key, etc.) — it resolves with { data: null, error }.
+// Without this check, a rejected send looks identical to a successful one to
+// every caller, which is why "Contact seller" could report success while no
+// email ever actually went out.
+async function send(params: Parameters<typeof resend.emails.send>[0]) {
+  const { error } = await resend.emails.send(params)
+  if (error) throw new Error(`Resend: ${error.message || error.name || 'send failed'}`)
+}
 
 // Escape user-supplied strings before interpolating into HTML to prevent injection
 function esc(s: string | undefined | null): string {
@@ -28,7 +38,7 @@ export async function sendListingSubmitted(listing: {
   sellerName: string; sellerEmail: string; contactEmail: string
   id: string
 }) {
-  await resend.emails.send({
+  await send({
     from: FROM,
     to: ADMIN,
     subject: `[PerfectPlane] New listing pending: ${listing.year} ${esc(listing.model)}`,
@@ -54,7 +64,7 @@ export async function sendListingApproved(listing: {
   model: string; year: number; price: number; currency?: string | null; typeRating: boolean
   sellerName: string; sellerEmail: string
 }) {
-  await resend.emails.send({
+  await send({
     from: FROM,
     to: listing.sellerEmail,
     subject: `[PerfectPlane] Your listing is live!`,
@@ -75,7 +85,7 @@ export async function sendListingApproved(listing: {
 export async function sendListingRejected(listing: {
   model: string; year: number; sellerName: string; sellerEmail: string
 }) {
-  await resend.emails.send({
+  await send({
     from: FROM,
     to: listing.sellerEmail,
     subject: `[PerfectPlane] Listing not approved`,
@@ -94,7 +104,7 @@ export async function sendJobApplication(application: {
   applicantName: string; applicantEmail: string
   coverLetter: string; cvUrl?: string | null
 }) {
-  await resend.emails.send({
+  await send({
     from: FROM,
     to: application.contactEmail,
     replyTo: safeEmail(application.applicantEmail),
@@ -124,7 +134,7 @@ export async function sendBuyerInquiry(inquiry: {
   // Fall back to admin only if the listing somehow has no contact email on file,
   // so the inquiry is never silently dropped.
   const to = inquiry.sellerEmail || ADMIN
-  await resend.emails.send({
+  await send({
     from: FROM,
     to,
     replyTo: safeEmail(inquiry.buyerEmail),

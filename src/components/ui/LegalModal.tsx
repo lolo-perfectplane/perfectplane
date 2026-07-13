@@ -86,7 +86,7 @@ We may update these Terms at any time. Continued use of the Platform after chang
 
 ## 12. Contact
 
-For any questions regarding these Terms, contact us at: **legal@perfectplane.com**
+For any questions regarding these Terms, contact us at: **legal@perfectplane.eu**
 `
 
 const PRIVACY_CONTENT = `
@@ -97,7 +97,7 @@ PerfectPlane ("we", "us", "our") is committed to protecting your personal data. 
 ## 1. Data Controller
 
 PerfectPlane
-Contact: **privacy@perfectplane.com**
+Contact: **privacy@perfectplane.eu**
 
 ## 2. Data We Collect
 
@@ -173,7 +173,7 @@ If you are in the EEA or UK, you have the right to:
 - **Objection** — object to processing based on legitimate interests
 - **Withdraw consent** — at any time, for processing based on consent
 
-To exercise any of these rights, contact us at **privacy@perfectplane.com**. We will respond within 30 days.
+To exercise any of these rights, contact us at **privacy@perfectplane.eu**. We will respond within 30 days.
 
 You also have the right to lodge a complaint with your national data protection authority (e.g. CNIL in France, ICO in the UK).
 
@@ -210,9 +210,9 @@ We may update this Privacy Policy from time to time. We will notify registered u
 
 ## 13. Contact
 
-For any privacy-related questions or requests: **privacy@perfectplane.com**
+For any privacy-related questions or requests: **privacy@perfectplane.eu**
 
-For urgent matters related to data breaches or legal requests: **legal@perfectplane.com**
+For urgent matters related to data breaches or legal requests: **legal@perfectplane.eu**
 `
 
 function renderContent(text: string) {
