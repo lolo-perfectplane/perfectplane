@@ -1335,10 +1335,33 @@ export function MyItemsModal({ userId, onClose, onChanged }: MyItemsProps) {
 // ── ContactModal ──────────────────────────────────────────────
 type ContactProps = { listing: Listing; user: User | null; onClose: () => void }
 
+const PHONE_CODES = [
+  { code: '+1',   label: 'US/CA +1' },
+  { code: '+33',  label: 'FR +33' },
+  { code: '+34',  label: 'ES +34' },
+  { code: '+32',  label: 'BE +32' },
+  { code: '+44',  label: 'UK +44' },
+  { code: '+49',  label: 'DE +49' },
+  { code: '+39',  label: 'IT +39' },
+  { code: '+41',  label: 'CH +41' },
+  { code: '+31',  label: 'NL +31' },
+  { code: '+351', label: 'PT +351' },
+  { code: '+352', label: 'LU +352' },
+  { code: '+43',  label: 'AT +43' },
+  { code: '+353', label: 'IE +353' },
+  { code: '+46',  label: 'SE +46' },
+  { code: '+47',  label: 'NO +47' },
+  { code: '+45',  label: 'DK +45' },
+  { code: '+48',  label: 'PL +48' },
+  { code: '+971', label: 'UAE +971' },
+  { code: '+61',  label: 'AU +61' },
+]
+
 export function ContactModal({ listing, user, onClose }: ContactProps) {
-  const [name,  setName]  = useState(user?.name || '')
-  const [email, setEmail] = useState(user?.email || '')
-  const [phone, setPhone] = useState('')
+  const [name,      setName]      = useState(user?.name || '')
+  const [email,      setEmail]     = useState(user?.email || '')
+  const [phoneCode, setPhoneCode] = useState('+1')
+  const [phone,     setPhone]     = useState('')
   const [msg,   setMsg]   = useState('')
   const [res,   setRes]   = useState<{ text: string; ok: boolean } | null>(null)
   const [loading, setLoading] = useState(false)
@@ -1353,7 +1376,7 @@ export function ContactModal({ listing, user, onClose }: ContactProps) {
       const r = await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ listingId: listing.id, buyerName: name, buyerEmail: email, buyerPhone: phone, message: msg }),
+        body: JSON.stringify({ listingId: listing.id, buyerName: name, buyerEmail: email, buyerPhone: phone ? `${phoneCode} ${phone}` : '', message: msg }),
       })
       const d = await r.json()
       if (d.error) { setRes({ text: d.error, ok: false }); return }
@@ -1395,16 +1418,22 @@ export function ContactModal({ listing, user, onClose }: ContactProps) {
           </div>
 
           <div style={fg}>
-            <label style={lbl}>Your name</label>
+            <label style={lbl}>Your name <span style={{ color: '#ff3b30' }}>*</span></label>
             <input style={inp} type="text" value={name} onChange={e => setName(e.target.value)} placeholder="John Smith" />
           </div>
           <div style={fg}>
-            <label style={lbl}>Your email</label>
+            <label style={lbl}>Your email <span style={{ color: '#ff3b30' }}>*</span></label>
             <input style={inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
           </div>
           <div style={fg}>
             <label style={lbl}>Phone (optional)</label>
-            <input style={inp} type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+1 234 567 8900" />
+            <div style={{ display: 'flex', gap: 6 }}>
+              <select value={phoneCode} onChange={e => setPhoneCode(e.target.value)}
+                style={{ ...inp, width: 96, flexShrink: 0, cursor: 'pointer', appearance: 'none' as any, padding: '0 8px' }}>
+                {PHONE_CODES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
+              </select>
+              <input style={inp} type="tel" value={phone} onChange={e => setPhone(e.target.value.replace(/[^\d ]/g, ''))} placeholder="234 567 8900" />
+            </div>
           </div>
           <div style={fg}>
             <label style={lbl}>Message</label>

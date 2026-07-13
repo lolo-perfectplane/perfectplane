@@ -151,12 +151,12 @@ export async function sendBuyerInquiry(inquiry: {
       <h3>Buyer</h3>
       <ul>
         <li>Name: ${esc(inquiry.buyerName)}</li>
-        <li>Email: ${esc(inquiry.buyerEmail)}</li>
+        <li>Email: <a href="mailto:${esc(inquiry.buyerEmail)}">${esc(inquiry.buyerEmail)}</a></li>
         ${inquiry.buyerPhone ? `<li>Phone: ${esc(inquiry.buyerPhone)}</li>` : ''}
       </ul>
       <h3>Message</h3>
       <p>${esc(inquiry.message) || '(no message)'}</p>
-      <p>Reply directly to this email to reach the buyer.</p>
+      <p>Just hit reply on this email — your reply goes straight to the buyer at ${esc(inquiry.buyerEmail)}, not to PerfectPlane.</p>
     `,
   })
 }
