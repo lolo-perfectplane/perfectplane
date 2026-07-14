@@ -5,8 +5,21 @@ import CookieConsentLoader from '@/components/ui/CookieConsentLoader'
 import './globals.css'
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://perfectplane.eu'),
   title: 'PerfectPlane — Find Your Aircraft',
   description: 'Match your mission to the perfect aircraft',
+  openGraph: {
+    title: 'PerfectPlane — Find Your Aircraft',
+    description: 'Match your mission to the perfect aircraft',
+    url: 'https://perfectplane.eu',
+    siteName: 'PerfectPlane',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'PerfectPlane — Find Your Aircraft',
+    description: 'Match your mission to the perfect aircraft',
+  },
 }
 
 const GTM_ID = process.env.NEXT_PUBLIC_GTM_ID
