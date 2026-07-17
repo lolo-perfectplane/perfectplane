@@ -10,15 +10,17 @@ import CompareToggle from './CompareToggle'
 import CompareModal from './CompareModal'
 
 // Build model-name lookup maps from the aircraft database
-const AC_TYPE:    Record<string, 'jet' | 'turbo' | 'piston'>              = {}
-const AC_FUEL:    Record<string, string>                                    = {}
-const AC_GEAR:    Record<string, string>                                    = {}
-const AC_ENGINES: Record<string, number>                                    = {}
+const AC_TYPE:     Record<string, 'jet' | 'turbo' | 'piston'>              = {}
+const AC_FUEL:     Record<string, string>                                    = {}
+const AC_GEAR:     Record<string, string>                                    = {}
+const AC_ENGINES:  Record<string, number>                                    = {}
+const AC_CATEGORY: Record<string, 'airplane' | 'helicopter' | 'gyrocopter' | 'trike'> = {}
 for (const a of AC) {
-  AC_TYPE[a.name]    = a.type
-  AC_FUEL[a.name]    = a.fuel.toLowerCase().replace('-', '-')   // 'Jet-A'→'jet-a', 'AvGas'→'avgas'
-  AC_GEAR[a.name]    = a.gear
-  AC_ENGINES[a.name] = a.engines
+  AC_TYPE[a.name]     = a.type
+  AC_FUEL[a.name]     = a.fuel.toLowerCase().replace('-', '-')   // 'Jet-A'→'jet-a', 'AvGas'→'avgas'
+  AC_GEAR[a.name]     = a.gear
+  AC_ENGINES[a.name]  = a.engines
+  AC_CATEGORY[a.name] = a.category ?? 'airplane'
 }
 // Normalise: 'Jet-A'→'jet-a', 'AvGas'→'avgas'
 for (const k of Object.keys(AC_FUEL)) {
@@ -118,10 +120,11 @@ type Props = {
   onToggleFavorite: (listingId: string) => void
 }
 
+type CategoryFilter = 'all' | 'airplane' | 'helicopter' | 'gyrocopter' | 'trike'
 type TypeFilter   = 'all' | 'jet' | 'turbo' | 'piston'
 type EngineFilter = 0 | 1 | 2 | 3 | 4
 type FuelFilter   = 'jet-a' | 'avgas' | null
-type GearFilter   = 'retractable' | 'tailwheel' | 'tricycle' | null
+type GearFilter   = 'retractable' | 'tailwheel' | 'tricycle' | 'skids' | null
 type Sort         = 'newest' | 'price_asc' | 'price_desc'
 
 const CURRENT_YEAR = new Date().getFullYear()
@@ -296,6 +299,7 @@ function ListingModal({ listing, onClose, onContact, user, onAuthRequired, onOpe
 
 export default function MarketTab({ listings: initialListings, onContact, onSell, user, initialSearch = '', onSearchChange, onAuthRequired, onOpenMessage, openListingId, onOpenListingHandled, favoriteIds, onToggleFavorite }: Props) {
   const [listings,    setListings]    = useState<Listing[]>(initialListings)
+  const [catFilter,   setCatFilter]   = useState<CategoryFilter>('all')
   const [typeFilter,  setTypeFilter]  = useState<TypeFilter>('all')
   const [engFilter,   setEngFilter]   = useState<EngineFilter>(0)
   const [fuelFilter,  setFuelFilter]  = useState<FuelFilter>(null)
@@ -320,8 +324,8 @@ export default function MarketTab({ listings: initialListings, onContact, onSell
     })
   }
 
-  const hasFilters = typeFilter !== 'all' || engFilter !== 0 || fuelFilter || gearFilter || ifrOnly || maxHours < MAX_HOURS || yearFrom > 1960 || yearTo < CURRENT_YEAR || !!brand || !!search
-  const clearAll = () => { setTypeFilter('all'); setEngFilter(0); setFuelFilter(null); setGearFilter(null); setIfrOnly(false); setMaxHours(MAX_HOURS); setYearFrom(1960); setYearTo(CURRENT_YEAR); setBrand(''); setSearch(''); onSearchChange?.('') }
+  const hasFilters = catFilter !== 'all' || typeFilter !== 'all' || engFilter !== 0 || fuelFilter || gearFilter || ifrOnly || maxHours < MAX_HOURS || yearFrom > 1960 || yearTo < CURRENT_YEAR || !!brand || !!search
+  const clearAll = () => { setCatFilter('all'); setTypeFilter('all'); setEngFilter(0); setFuelFilter(null); setGearFilter(null); setIfrOnly(false); setMaxHours(MAX_HOURS); setYearFrom(1960); setYearTo(CURRENT_YEAR); setBrand(''); setSearch(''); onSearchChange?.('') }
 
   // Sync when parent navigates here with a pre-filled search (e.g. "See offers")
   useEffect(() => { setSearch(initialSearch) }, [initialSearch])
@@ -346,6 +350,7 @@ export default function MarketTab({ listings: initialListings, onContact, onSell
 
   // Apply all filters except brand/search — used for brand grid counts
   const preFiltered = listings
+    .filter(l => catFilter === 'all' || (AC_CATEGORY[l.model] ?? 'airplane') === catFilter)
     .filter(l => typeFilter === 'all' || (l.model && AC_TYPE[l.model] === typeFilter))
     .filter(l => engFilter === 0 || (l.engines ?? AC_ENGINES[l.model]) === engFilter)
     .filter(l => !fuelFilter || (l.fuel ?? AC_FUEL[l.model]) === fuelFilter)
@@ -544,6 +549,22 @@ export default function MarketTab({ listings: initialListings, onContact, onSell
           <div className="pp-panel" style={{ padding: 18, background: 'rgba(255,255,255,0.9)', overflowY: 'auto' }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 14 }}>Filters</div>
 
+            {/* Category */}
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#86868b', marginBottom: 7 }}>Category</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+              {(['airplane', 'helicopter', 'gyrocopter', 'trike'] as CategoryFilter[]).map(f => (
+                <button key={f} onClick={() => setCatFilter(catFilter === f ? 'all' : f)} style={{
+                  height: 30, padding: '0 13px', borderRadius: 100, cursor: 'pointer', fontFamily: 'inherit',
+                  fontSize: 12, fontWeight: 500,
+                  background: catFilter === f ? '#0a84ff' : 'transparent',
+                  border: catFilter === f ? 'none' : '0.5px solid rgba(0,0,0,0.12)',
+                  color: catFilter === f ? '#fff' : '#1d1d1f',
+                }}>
+                  {f === 'airplane' ? '✈ Airplane' : f === 'helicopter' ? '🚁 Helicopter' : f === 'gyrocopter' ? 'Gyrocopter' : 'Trike'}
+                </button>
+              ))}
+            </div>
+
             {/* Aircraft type */}
             <div style={{ fontSize: 11, fontWeight: 600, color: '#86868b', marginBottom: 7 }}>Type</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
@@ -598,7 +619,7 @@ export default function MarketTab({ listings: initialListings, onContact, onSell
             {/* Landing gear */}
             <div style={{ fontSize: 11, fontWeight: 600, color: '#86868b', marginBottom: 7 }}>Landing gear</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
-              {([['retractable', 'Retractable'], ['tricycle', 'Tricycle'], ['tailwheel', 'Tail-wheel']] as [GearFilter, string][]).map(([g, label]) => (
+              {([['retractable', 'Retractable'], ['tricycle', 'Tricycle'], ['tailwheel', 'Tail-wheel'], ['skids', 'Skids']] as [GearFilter, string][]).map(([g, label]) => (
                 <button key={g!} onClick={() => setGearFilter(gearFilter === g ? null : g)} style={{
                   height: 30, padding: '0 13px', borderRadius: 100, cursor: 'pointer', fontFamily: 'inherit',
                   fontSize: 12, fontWeight: 500,

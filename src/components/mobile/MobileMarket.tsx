@@ -10,15 +10,17 @@ import FavoriteButton from '@/components/ui/FavoriteButton'
 import CompareToggle from '@/components/ui/CompareToggle'
 import CompareModal from '@/components/ui/CompareModal'
 
-const AC_TYPE:    Record<string, string> = {}
-const AC_FUEL:    Record<string, string> = {}
-const AC_GEAR:    Record<string, string> = {}
-const AC_ENGINES: Record<string, number> = {}
+const AC_TYPE:     Record<string, string> = {}
+const AC_FUEL:     Record<string, string> = {}
+const AC_GEAR:     Record<string, string> = {}
+const AC_ENGINES:  Record<string, number> = {}
+const AC_CATEGORY: Record<string, 'airplane' | 'helicopter' | 'gyrocopter' | 'trike'> = {}
 for (const a of AC) {
-  AC_TYPE[a.name]    = a.type
-  AC_FUEL[a.name]    = a.fuel === 'Jet-A' ? 'jet-a' : 'avgas'
-  AC_GEAR[a.name]    = a.gear
-  AC_ENGINES[a.name] = a.engines
+  AC_TYPE[a.name]     = a.type
+  AC_FUEL[a.name]     = a.fuel === 'Jet-A' ? 'jet-a' : 'avgas'
+  AC_GEAR[a.name]     = a.gear
+  AC_ENGINES[a.name]  = a.engines
+  AC_CATEGORY[a.name] = a.category ?? 'airplane'
 }
 
 type User = { id: string; name: string; email: string; role: string }
@@ -31,10 +33,11 @@ type Props = {
   favoriteIds: Set<string>
   onToggleFavorite: (listingId: string) => void
 }
+type CategoryFilter = 'all' | 'airplane' | 'helicopter' | 'gyrocopter' | 'trike'
 type TypeFilter   = 'all' | 'jet' | 'turbo' | 'piston'
 type EngineFilter = 0 | 1 | 2 | 3 | 4
 type FuelFilter   = 'jet-a' | 'avgas' | null
-type GearFilter   = 'retractable' | 'tailwheel' | 'tricycle' | null
+type GearFilter   = 'retractable' | 'tailwheel' | 'tricycle' | 'skids' | null
 
 const CURRENT_YEAR = new Date().getFullYear()
 const MAX_HOURS    = 50000
@@ -133,6 +136,7 @@ type FilterSheetProps = {
   activeFilterCount: number
   clearAll: () => void
   filtered: any[]
+  catFilter: CategoryFilter; setCatFilter: (v: CategoryFilter) => void
   typeFilter: TypeFilter; setTypeFilter: (v: TypeFilter) => void
   engFilter: EngineFilter; setEngFilter: (v: EngineFilter) => void
   fuelFilter: FuelFilter; setFuelFilter: (v: FuelFilter | null) => void
@@ -144,6 +148,7 @@ type FilterSheetProps = {
 }
 
 function FilterSheet({ onClose, activeFilterCount, clearAll, filtered,
+  catFilter, setCatFilter,
   typeFilter, setTypeFilter, engFilter, setEngFilter,
   fuelFilter, setFuelFilter, gearFilter, setGearFilter,
   ifrOnly, setIfrOnly,
@@ -219,6 +224,15 @@ function FilterSheet({ onClose, activeFilterCount, clearAll, filtered,
         {/* Scrollable content */}
         <div style={{ overflowY: 'auto', padding: '16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Category</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <Chip label="✈ Airplane"   active={catFilter === 'airplane'}   onToggle={() => setCatFilter(catFilter === 'airplane'   ? 'all' : 'airplane')} />
+              <Chip label="🚁 Helicopter" active={catFilter === 'helicopter'} onToggle={() => setCatFilter(catFilter === 'helicopter' ? 'all' : 'helicopter')} />
+              <Chip label="Gyrocopter"   active={catFilter === 'gyrocopter'} onToggle={() => setCatFilter(catFilter === 'gyrocopter' ? 'all' : 'gyrocopter')} />
+              <Chip label="Trike"        active={catFilter === 'trike'}      onToggle={() => setCatFilter(catFilter === 'trike'      ? 'all' : 'trike')} />
+            </div>
+          </div>
+          <div>
             <div style={{ fontSize: 11, fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Type</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <Chip label="Jet"       active={typeFilter === 'jet'}    onToggle={() => setTypeFilter(typeFilter === 'jet'    ? 'all' : 'jet')} />
@@ -248,6 +262,7 @@ function FilterSheet({ onClose, activeFilterCount, clearAll, filtered,
               <Chip label="Retractable" active={gearFilter === 'retractable'} onToggle={() => setGearFilter(gearFilter === 'retractable' ? null : 'retractable')} />
               <Chip label="Tricycle"    active={gearFilter === 'tricycle'}    onToggle={() => setGearFilter(gearFilter === 'tricycle'    ? null : 'tricycle')} />
               <Chip label="Tail-wheel"  active={gearFilter === 'tailwheel'}   onToggle={() => setGearFilter(gearFilter === 'tailwheel'   ? null : 'tailwheel')} />
+              <Chip label="Skids"       active={gearFilter === 'skids'}       onToggle={() => setGearFilter(gearFilter === 'skids'       ? null : 'skids')} />
             </div>
           </div>
           <div>
@@ -530,6 +545,7 @@ export default function MobileMarket({ listings: initialListings, onContact, onS
   }
 
   // Filter state — mirrors desktop
+  const [catFilter,   setCatFilter]   = useState<CategoryFilter>('all')
   const [typeFilter,  setTypeFilter]  = useState<TypeFilter>('all')
   const [engFilter,   setEngFilter]   = useState<EngineFilter>(0)
   const [fuelFilter,  setFuelFilter]  = useState<FuelFilter>(null)
@@ -555,14 +571,15 @@ export default function MobileMarket({ listings: initialListings, onContact, onS
     if (found) { setSelListing(found); onOpenListingHandled?.() }
   }, [openListingId, listings, onOpenListingHandled])
 
-  const activeFilterCount = (typeFilter !== 'all' ? 1 : 0) + (engFilter !== 0 ? 1 : 0) +
+  const activeFilterCount = (catFilter !== 'all' ? 1 : 0) + (typeFilter !== 'all' ? 1 : 0) + (engFilter !== 0 ? 1 : 0) +
     (fuelFilter ? 1 : 0) + (gearFilter ? 1 : 0) + (ifrOnly ? 1 : 0) +
     (maxHours < MAX_HOURS ? 1 : 0) + (yearFrom > 1960 || yearTo < CURRENT_YEAR ? 1 : 0)
 
-  const clearAll = () => { setTypeFilter('all'); setEngFilter(0); setFuelFilter(null); setGearFilter(null); setIfrOnly(false); setMaxHours(MAX_HOURS); setYearFrom(1960); setYearTo(CURRENT_YEAR) }
+  const clearAll = () => { setCatFilter('all'); setTypeFilter('all'); setEngFilter(0); setFuelFilter(null); setGearFilter(null); setIfrOnly(false); setMaxHours(MAX_HOURS); setYearFrom(1960); setYearTo(CURRENT_YEAR) }
 
   // Apply all filters except brand/search — used for brand grid counts
   const preFiltered = listings
+    .filter(l => catFilter === 'all' || (AC_CATEGORY[l.model ?? ''] ?? 'airplane') === catFilter)
     .filter(l => typeFilter === 'all' || (l.model && AC_TYPE[l.model] === typeFilter))
     .filter(l => engFilter === 0 || (l.engines ?? AC_ENGINES[l.model]) === engFilter)
     .filter(l => !fuelFilter || (l.fuel ?? AC_FUEL[l.model]) === fuelFilter)
@@ -748,6 +765,7 @@ export default function MobileMarket({ listings: initialListings, onContact, onS
           activeFilterCount={activeFilterCount}
           clearAll={clearAll}
           filtered={filtered}
+          catFilter={catFilter}   setCatFilter={setCatFilter}
           typeFilter={typeFilter} setTypeFilter={setTypeFilter}
           engFilter={engFilter}   setEngFilter={setEngFilter}
           fuelFilter={fuelFilter} setFuelFilter={setFuelFilter}
