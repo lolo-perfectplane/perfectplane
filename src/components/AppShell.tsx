@@ -119,6 +119,10 @@ const GlobeMap = dynamic(() => import('./globe/GlobeMap'), { ssr: false })
 
 const ALL_AIRPORTS = AIRPORTS.map(a => ({ ic: a.icao, la: a.lat, lo: a.lon }))
 
+// Model name → category, used to color/iconify globe dots (helicopters get their own marker)
+const AC_CATEGORY: Record<string, 'airplane' | 'helicopter' | 'gyrocopter' | 'trike'> = {}
+for (const a of AC) AC_CATEGORY[a.name] = a.category ?? 'airplane'
+
 // Build ICAO and IATA → {lat,lon} lookups for resolving listing locations
 const AIRPORT_COORDS: Record<string, { lat: number; lon: number }> = {}
 for (const a of AIRPORTS) {
@@ -131,8 +135,9 @@ function resolveListingDots(listings: import('@/lib/supabase').Listing[]) {
     // Coordinates captured once from Supabase when the seller picked their
     // airport at listing time — no re-resolution needed, and no fragility
     // from parsing the free-text location string.
+    const category = AC_CATEGORY[l.model ?? ''] ?? 'airplane'
     if (l.lat != null && l.lon != null) {
-      return [{ lon: l.lon, lat: l.lat, model: l.model ?? '', price: l.price ?? null, currency: l.currency ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id }]
+      return [{ lon: l.lon, lat: l.lat, model: l.model ?? '', price: l.price ?? null, currency: l.currency ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id, category }]
     }
     if (!l.location) return []
     const tokens = l.location.trim().toUpperCase().split(/[\s—\-,/]+/)
@@ -142,12 +147,12 @@ function resolveListingDots(listings: import('@/lib/supabase').Listing[]) {
         // fuzzy matching — airports.ts is hand-edited and codes can be
         // renamed/removed, so a strict dictionary lookup silently drops pins.
         const ap = AIRPORT_COORDS[tok] ?? lookupAirport(tok)
-        if (ap) return [{ lon: ap.lon, lat: ap.lat, model: l.model ?? '', price: l.price ?? null, currency: l.currency ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id }]
+        if (ap) return [{ lon: ap.lon, lat: ap.lat, model: l.model ?? '', price: l.price ?? null, currency: l.currency ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id, category }]
       }
     }
     // Last resort: try resolving the full location string (handles names/formats that don't tokenize cleanly)
     const byName = lookupAirport(l.location)
-    if (byName) return [{ lon: byName.lon, lat: byName.lat, model: l.model ?? '', price: l.price ?? null, currency: l.currency ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id }]
+    if (byName) return [{ lon: byName.lon, lat: byName.lat, model: l.model ?? '', price: l.price ?? null, currency: l.currency ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id, category }]
     return []
   })
   return dots

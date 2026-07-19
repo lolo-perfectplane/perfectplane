@@ -6,7 +6,7 @@ import type { Params } from '@/components/AppShell'
 import type { APEntry } from '@/lib/airports'
 import { AIRPORTS, lookupAirport } from '@/lib/airports'
 import type { Listing } from '@/lib/supabase'
-import type { AC } from '@/lib/aircraft'
+import { AC } from '@/lib/aircraft'
 import { createClient } from '@/lib/supabase'
 import { authFetch } from '@/lib/authFetch'
 import AirportPicker, { type RemoteAirport } from '@/components/ui/AirportPicker'
@@ -28,12 +28,17 @@ for (const a of AIRPORTS) {
   _AIRPORT_COORDS[a.icao.toUpperCase()] = { lat: a.lat, lon: a.lon }
   if (a.iata) _AIRPORT_COORDS[a.iata.toUpperCase()] = { lat: a.lat, lon: a.lon }
 }
+// Model name → category, used to color/iconify globe dots (helicopters get their own marker)
+const _AC_CATEGORY: Record<string, 'airplane' | 'helicopter' | 'gyrocopter' | 'trike'> = {}
+for (const a of AC) _AC_CATEGORY[a.name] = a.category ?? 'airplane'
+
 function resolveListingDots(listings: Listing[]) {
   return listings.flatMap(l => {
     // Coordinates captured once from Supabase when the seller picked their
     // airport at listing time — no re-resolution needed.
+    const category = _AC_CATEGORY[l.model ?? ''] ?? 'airplane'
     if (l.lat != null && l.lon != null) {
-      return [{ lon: l.lon, lat: l.lat, model: l.model ?? '', price: l.price ?? null, currency: l.currency ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id }]
+      return [{ lon: l.lon, lat: l.lat, model: l.model ?? '', price: l.price ?? null, currency: l.currency ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id, category }]
     }
     if (!l.location) return []
     const tokens = l.location.trim().toUpperCase().split(/[\s—\-,/]+/)
@@ -42,11 +47,11 @@ function resolveListingDots(listings: Listing[]) {
         // Exact match first, then fuzzy fallback — airports.ts is hand-edited
         // and codes can be renamed/removed, silently dropping pins otherwise.
         const ap = _AIRPORT_COORDS[tok] ?? lookupAirport(tok)
-        if (ap) return [{ lon: ap.lon, lat: ap.lat, model: l.model ?? '', price: l.price ?? null, currency: l.currency ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id }]
+        if (ap) return [{ lon: ap.lon, lat: ap.lat, model: l.model ?? '', price: l.price ?? null, currency: l.currency ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id, category }]
       }
     }
     const byName = lookupAirport(l.location)
-    if (byName) return [{ lon: byName.lon, lat: byName.lat, model: l.model ?? '', price: l.price ?? null, currency: l.currency ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id }]
+    if (byName) return [{ lon: byName.lon, lat: byName.lat, model: l.model ?? '', price: l.price ?? null, currency: l.currency ?? null, condition: l.condition ?? null, reg: l.reg ?? '', location: l.location ?? '', listingId: l.id, category }]
     return []
   })
 }

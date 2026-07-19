@@ -13,6 +13,7 @@ type WindUV   = WindPoint[] | null
 type ListingDot = {
   lon: number; lat: number; model: string; price: number | null; currency?: string | null
   condition?: string | null; reg?: string; location?: string; listingId?: string
+  category?: 'airplane' | 'helicopter' | 'gyrocopter' | 'trike'
 }
 
 // Info-badge color by listing condition
@@ -236,6 +237,7 @@ function dotsToGeoJSON(dots: ListingDot[]): GeoJSON.FeatureCollection {
           reg: dot.reg ?? '',
           location: dot.location ?? '',
           listingId: dot.listingId ?? '',
+          category: dot.category ?? 'airplane',
         },
       })
     })
@@ -246,6 +248,41 @@ function dotsToGeoJSON(dots: ListingDot[]): GeoJSON.FeatureCollection {
 function applyDots(map: mapboxgl.Map, dots: ListingDot[]) {
   const src = map.getSource('listings') as mapboxgl.GeoJSONSource | undefined
   if (src) src.setData(dotsToGeoJSON(dots))
+}
+
+// Helicopter listing dots get their own icon — the 🚁 emoji lives outside the Basic
+// Multilingual Plane, which Mapbox's glyph service doesn't rasterize, so it's drawn
+// as a small canvas silhouette and registered as a sprite image instead of text.
+function buildHeliIconData(size = 64): { width: number; height: number; data: Uint8ClampedArray } {
+  const canvas = document.createElement('canvas')
+  canvas.width = size; canvas.height = size
+  const ctx = canvas.getContext('2d')!
+  const s = size / 64
+  ctx.strokeStyle = '#ffffff'
+  ctx.fillStyle   = '#ffffff'
+  ctx.lineCap     = 'round'
+  // Main rotor
+  ctx.lineWidth = 3 * s
+  ctx.beginPath(); ctx.moveTo(6 * s, 10 * s); ctx.lineTo(58 * s, 10 * s); ctx.stroke()
+  // Mast
+  ctx.beginPath(); ctx.moveTo(32 * s, 10 * s); ctx.lineTo(32 * s, 20 * s); ctx.stroke()
+  // Body
+  ctx.beginPath(); ctx.ellipse(30 * s, 36 * s, 17 * s, 12 * s, 0, 0, Math.PI * 2); ctx.fill()
+  // Tail boom
+  ctx.lineWidth = 4 * s
+  ctx.beginPath(); ctx.moveTo(46 * s, 34 * s); ctx.lineTo(60 * s, 22 * s); ctx.stroke()
+  // Tail rotor
+  ctx.lineWidth = 2.5 * s
+  ctx.beginPath(); ctx.moveTo(60 * s, 15 * s); ctx.lineTo(60 * s, 29 * s); ctx.stroke()
+  // Skids
+  ctx.lineWidth = 2 * s
+  ctx.beginPath()
+  ctx.moveTo(16 * s, 48 * s); ctx.lineTo(44 * s, 48 * s)
+  ctx.moveTo(20 * s, 44 * s); ctx.lineTo(20 * s, 48 * s)
+  ctx.moveTo(40 * s, 44 * s); ctx.lineTo(40 * s, 48 * s)
+  ctx.stroke()
+  const img = ctx.getImageData(0, 0, size, size)
+  return { width: size, height: size, data: img.data }
 }
 
 // ── Component ─────────────────────────────────────────────────
@@ -378,26 +415,31 @@ export default function GlobeMap({
 
       // Listing offer dots — added last so they render on top of airport dots,
       // the home base marker, the destination marker, and leg-stop markers.
-      // Sized/faded by zoom so they only become visible once zoomed in.
+      // Big and easy to spot from a world view, then shrink as you zoom in for
+      // precise pinpointing (inverse of a normal marker — dots start large and
+      // taper down instead of growing).
+      if (!map.hasImage('heli-icon')) map.addImage('heli-icon', buildHeliIconData(64), { pixelRatio: 2 })
+
       map.addSource('listings', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
       map.addLayer({
         id: 'listing-dots', type: 'circle', source: 'listings',
         paint: {
-          'circle-radius':       ['interpolate', ['linear'], ['zoom'], 2, 0, 3.5, 3.375, 5, 8.4, 8, 13.5],
-          'circle-color':        '#30d158',
+          'circle-radius':       ['interpolate', ['linear'], ['zoom'], 1, 0, 1.8, 8, 4, 8.5, 7, 9, 10, 9.5, 14, 10, 18, 10.5],
+          'circle-color':        ['case', ['==', ['get', 'category'], 'helicopter'], '#ff9f0a', '#30d158'],
           'circle-stroke-width': 2,
           'circle-stroke-color': '#ffffff',
-          'circle-opacity':      ['interpolate', ['linear'], ['zoom'], 2, 0, 3.5, 0.6, 5, 1],
-          'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], 2, 0, 3.5, 0.6, 5, 1],
+          'circle-opacity':      ['step', ['zoom'], 0, 1.8, 1],
+          'circle-stroke-opacity': ['step', ['zoom'], 0, 1.8, 1],
         },
       })
-      // Small airplane glyph centered inside each listing dot
+      // Small airplane glyph centered inside non-helicopter listing dots
       map.addLayer({
         id: 'listing-plane-icons', type: 'symbol', source: 'listings',
+        filter: ['!=', ['get', 'category'], 'helicopter'],
         layout: {
           'text-field':          '✈',
           'text-font':           ['Arial Unicode MS Regular'],
-          'text-size':           ['interpolate', ['linear'], ['zoom'], 2, 0, 3.5, 10.5, 5, 16.5, 8, 21],
+          'text-size':           ['interpolate', ['linear'], ['zoom'], 1, 0, 1.8, 15, 4, 15.5, 7, 16, 10, 17, 14, 17.5, 18, 18],
           'text-anchor':         'center',
           'text-allow-overlap':  true,
           'text-ignore-placement': true,
@@ -405,7 +447,22 @@ export default function GlobeMap({
         },
         paint: {
           'text-color':   '#ffffff',
-          'text-opacity': ['interpolate', ['linear'], ['zoom'], 2, 0, 3.5, 0.6, 5, 1],
+          'text-opacity': ['step', ['zoom'], 0, 1.8, 1],
+        },
+      })
+      // Helicopter icon (canvas sprite — 🚁 is outside Mapbox's glyph range)
+      map.addLayer({
+        id: 'listing-heli-icons', type: 'symbol', source: 'listings',
+        filter: ['==', ['get', 'category'], 'helicopter'],
+        layout: {
+          'icon-image':             'heli-icon',
+          'icon-size':              ['interpolate', ['linear'], ['zoom'], 1, 0, 1.8, 0.32, 4, 0.33, 7, 0.34, 10, 0.36, 14, 0.39, 18, 0.41],
+          'icon-anchor':            'center',
+          'icon-allow-overlap':     true,
+          'icon-ignore-placement':  true,
+        },
+        paint: {
+          'icon-opacity': ['step', ['zoom'], 0, 1.8, 1],
         },
       })
 
