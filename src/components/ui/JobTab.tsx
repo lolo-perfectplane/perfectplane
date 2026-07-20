@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
+import AirportPicker, { type RemoteAirport } from '@/components/ui/AirportPicker'
 
 type User = { id: string; name: string; email: string; role: string }
 
@@ -11,6 +12,8 @@ export type Job = {
   title: string
   company: string
   location: string
+  lat: number | null
+  lon: number | null
   job_type: string
   function_title: string | null
   region: string | null
@@ -62,7 +65,7 @@ const JOB_TYPES = ['Full-time', 'Part-time', 'Contract', 'Seasonal', 'Charter']
 export function PostJobModal({ user, onClose, onSuccess }: { user: User; onClose: () => void; onSuccess: () => void }) {
   const [title,      setTitle]      = useState('')
   const [company,    setCompany]    = useState('')
-  const [location,   setLocation]   = useState('')
+  const [loc,        setLoc]        = useState<RemoteAirport | null>(null)
   const [jobType,    setJobType]    = useState('Full-time')
   const [funcTitle,  setFuncTitle]  = useState('')
   const [region,     setRegion]     = useState('')
@@ -98,7 +101,7 @@ export function PostJobModal({ user, onClose, onSuccess }: { user: User; onClose
   }
 
   const submit = async () => {
-    if (!title || !company || !location || !region || !salary || !desc || !reqs || !minTotal || !minCs25 || !minCs23 || !minPic || !contact) {
+    if (!title || !company || !loc?.icao || !region || !salary || !desc || !reqs || !minTotal || !minCs25 || !minCs23 || !minPic || !contact) {
       setMsg({ text: 'Please fill all required fields.', ok: false }); return
     }
     if (logoUploading) { setMsg({ text: 'Please wait for the logo to finish uploading.', ok: false }); return }
@@ -108,7 +111,7 @@ export function PostJobModal({ user, onClose, onSuccess }: { user: User; onClose
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title, company, location, jobType, description: desc,
+          title, company, location: `${loc.icao} — ${loc.name}`, lat: loc.lat, lon: loc.lon, jobType, description: desc,
           functionTitle: funcTitle || null, region: region || null,
           requirements: reqs || null, salaryRange: salary || null,
           minHoursTotal: minTotal || null, minHoursCs25: minCs25 || null,
@@ -185,7 +188,13 @@ export function PostJobModal({ user, onClose, onSuccess }: { user: User; onClose
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
             <div>
               <label style={lbl}>Base / Location <R /></label>
-              <input style={inp} value={location} onChange={e => setLocation(e.target.value)} placeholder="LFPG — Paris CDG" />
+              <AirportPicker
+                initialLabel={loc ? `${loc.icao} — ${loc.name}` : ''}
+                hasValue={!!loc}
+                onChange={setLoc}
+                inputStyle={inp}
+                placeholder="LFPG — Paris CDG"
+              />
             </div>
             <div>
               <label style={lbl}>Salary range <R /></label>

@@ -8,7 +8,7 @@ export async function GET() {
   const supabase = createServerClient()
   const { data, error } = await supabase
     .from('jobs')
-    .select('id,title,company,location,job_type,function_title,region,description,requirements,salary_range,min_hours_total,min_hours_cs25,min_hours_cs23,min_hours_pic,logo_url,poster_name,approved_at')
+    .select('id,title,company,location,lat,lon,job_type,function_title,region,description,requirements,salary_range,min_hours_total,min_hours_cs25,min_hours_cs23,min_hours_pic,logo_url,poster_name,approved_at')
     .eq('status', 'approved')
     // Defensive filter in case the hourly cleanup cron hasn't run yet —
     // the cron job is the source of truth for actual deletion.
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { title, company, location, jobType, functionTitle, region, description, requirements, salaryRange, contactEmail, posterId, posterName, minHoursTotal, minHoursCs25, minHoursCs23, minHoursPic, expiresInDays, logoUrl } = body
+    const { title, company, location, lat, lon, jobType, functionTitle, region, description, requirements, salaryRange, contactEmail, posterId, posterName, minHoursTotal, minHoursCs25, minHoursCs23, minHoursPic, expiresInDays, logoUrl } = body
 
     if (!title || !company || !location || !description || !contactEmail || !posterId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
       .from('jobs')
       .insert({
         title, company, location,
+        lat: lat ?? null, lon: lon ?? null,
         job_type:        jobType        || 'Full-time',
         function_title:  functionTitle  || null,
         region:          region         || null,
@@ -98,6 +99,8 @@ export async function PATCH(req: NextRequest) {
       title:           edits.title,
       company:         edits.company,
       location:        edits.location,
+      lat:             edits.lat ?? null,
+      lon:             edits.lon ?? null,
       job_type:        edits.job_type,
       function_title:  edits.function_title  || null,
       region:          edits.region          || null,

@@ -1,7 +1,7 @@
 'use client'
 // src/components/mobile/MobileShell.tsx
 import dynamic from 'next/dynamic'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Params } from '@/components/AppShell'
 import type { APEntry } from '@/lib/airports'
 import { AIRPORTS, lookupAirport } from '@/lib/airports'
@@ -14,6 +14,7 @@ import MobileFiltersDrawer from './MobileFiltersDrawer'
 import MobileResultsSheet from './MobileResultsSheet'
 import MobileMarket from './MobileMarket'
 import MobileProfile from './MobileProfile'
+import type { Job } from '@/components/ui/JobTab'
 import AuthModal from '@/components/ui/AuthModal'
 import { SellModal, AdminModal, ContactModal, MyItemsModal } from '@/components/listings/Modals'
 import MessageModal, { type MessageListing } from '@/components/ui/MessageModal'
@@ -56,6 +57,18 @@ function resolveListingDots(listings: Listing[]) {
   })
 }
 
+// Job pins — location always comes from AirportPicker now, lat/lon captured at posting time.
+function resolveJobDots(jobs: Job[]) {
+  return jobs
+    .filter(j => j.lat != null && j.lon != null)
+    .map(j => ({
+      lon: j.lon as number, lat: j.lat as number,
+      model: '', price: null as number | null,
+      category: 'job' as const,
+      title: j.title, company: j.company, location: j.location, jobId: j.id,
+    }))
+}
+
 type MobileTab = 'globe' | 'market' | 'jobs' | 'profile'
 type Modal = 'none' | 'auth' | 'sell' | 'admin' | 'contact' | 'myitems'
 type WindPoint = { lat: number; lon: number; u: number; v: number; spd: number }
@@ -83,6 +96,7 @@ export interface MobileShellProps {
   windUV: WindPoint[] | null
   showWind: boolean
   listings: Listing[]
+  jobs: Job[]
   onHomeAP: (code: string) => void
   onHomeAirportSelect: (ap: RemoteAirport | null) => void
   onRoutCalc: (from: string, to: string) => { from: APEntry | null; to: APEntry | null }
@@ -104,7 +118,7 @@ export default function MobileShell(props: MobileShellProps) {
     onSelectAC, windLevel,
     results, contactListing, setContactListing,
     user, setUser, windBR, windUV, showWind,
-    listings, onHomeAP, onHomeAirportSelect, onRoutCalc, onFind, openOffers, openContact,
+    listings, jobs, onHomeAP, onHomeAirportSelect, onRoutCalc, onFind, openOffers, openContact,
     onWindToggle, onWindFetch, refreshListings,
     reachableAirports, allAirports,
   } = props
@@ -124,6 +138,21 @@ export default function MobileShell(props: MobileShellProps) {
 
   const requestAuth = (message?: string) => { setAuthMessage(message); openModal('auth') }
   const handleSeeOffer = (listingId: string) => { setOpenListingId(listingId); setActiveTab('market') }
+  const handleSeeJob = () => { setActiveTab('jobs') }
+
+  const [visibleCats, setVisibleCats] = useState<Record<'airplane' | 'helicopter' | 'jobs', boolean>>({ airplane: true, helicopter: true, jobs: true })
+  const toggleCat = (k: 'airplane' | 'helicopter' | 'jobs') => setVisibleCats(prev => ({ ...prev, [k]: !prev[k] }))
+  const [layersOpen, setLayersOpen] = useState(false)
+  const layersRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!layersOpen) return
+    const handler = (e: MouseEvent | TouchEvent) => {
+      if (layersRef.current && !layersRef.current.contains(e.target as Node)) setLayersOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    document.addEventListener('touchstart', handler)
+    return () => { document.removeEventListener('mousedown', handler); document.removeEventListener('touchstart', handler) }
+  }, [layersOpen])
 
   const fetchUnread = useCallback(async () => {
     if (!user) { setUnreadCount(0); return }
@@ -274,8 +303,12 @@ export default function MobileShell(props: MobileShellProps) {
           windParticles={[]}
           active={activeTab === 'globe'}
           onMapLoad={() => {}}
-          listingDots={resolveListingDots(listings)}
+          listingDots={[
+            ...resolveListingDots(listings).filter(d => visibleCats[d.category === 'helicopter' ? 'helicopter' : 'airplane']),
+            ...(visibleCats.jobs ? resolveJobDots(jobs) : []),
+          ]}
           onSeeOffer={handleSeeOffer}
+          onSeeJob={handleSeeJob}
         />
       </div>
 
@@ -283,7 +316,7 @@ export default function MobileShell(props: MobileShellProps) {
       {activeTab === 'globe' && (
         <>
           {/* Home airport input — top left under header */}
-          <div style={{ position: 'fixed', top: HDR_H + 28, left: '4%', zIndex: 110, width: 168 }}>
+          <div style={{ position: 'fixed', top: HDR_H + 28, left: '4%', zIndex: 110, width: 260 }}>
             <div style={{ position: 'relative' }}>
               <AirportPicker
                 placeholder="Home airport"
@@ -310,25 +343,6 @@ export default function MobileShell(props: MobileShellProps) {
             </div>
           </div>
 
-          {/* Wind toggle — top right under header */}
-          <button
-            onClick={() => { const next = !showWind; onWindToggle(next); if (next) onWindFetch() }}
-            style={{
-              position: 'fixed', top: HDR_H + 28, right: '4%', zIndex: 110,
-              width: 168, height: 38, padding: '0 14px', boxSizing: 'border-box',
-              borderRadius: 17, border: 'none',
-              background: showWind ? 'rgba(52,199,89,0.22)' : 'rgba(255,255,255,0.22)',
-              backdropFilter: 'blur(16px) saturate(180%)',
-              color: showWind ? '#34c759' : '#ffffff',
-              fontSize: 16, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-            }}
-          >
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: showWind ? '#34c759' : '#ff3b30', display: 'inline-block', transition: 'background 0.2s' }} />
-            <span key={windLevel} style={{ animation: 'fadeIn 0.3s ease' }}>Winds · {windLevel}</span>
-          </button>
-
           {/* Results pill — above filters pill (only when results exist) */}
           {results.length > 0 && (
             <button
@@ -352,27 +366,102 @@ export default function MobileShell(props: MobileShellProps) {
             </button>
           )}
 
-          {/* Find my perfect plane pill */}
-          <button
-            onClick={() => homeAp && setFiltersOpen(true)}
-            style={{
-              position: 'fixed',
-              bottom: TAB_H + 14,
-              left: '50%', transform: 'translateX(-50%)',
-              zIndex: 50,
-              height: 48, padding: '0 24px',
-              borderRadius: 24, border: 'none',
-              background: homeAp ? '#0a84ff' : 'rgba(10,132,255,0.35)',
-              color: '#fff', fontSize: 14, fontWeight: 600, fontFamily: 'inherit',
-              cursor: homeAp ? 'pointer' : 'not-allowed',
-              display: 'flex', alignItems: 'center', gap: 7,
-              boxShadow: homeAp ? '0 4px 16px rgba(10,132,255,0.5)' : 'none',
-              whiteSpace: 'nowrap',
-              transition: 'background 0.2s, box-shadow 0.2s',
-            }}
-          >
-            ✦ Find my perfect plane
-          </button>
+          {/* Wind toggle square + Find my perfect plane pill + layer-filter square */}
+          <div style={{
+            position: 'fixed', bottom: TAB_H + 14, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 50, display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <button
+              onClick={() => { const next = !showWind; onWindToggle(next); if (next) onWindFetch() }}
+              title={showWind ? `Wind ON (${windLevel})` : 'Wind OFF'}
+              style={{
+                position: 'relative', width: 48, height: 48, borderRadius: 14, border: 'none', cursor: 'pointer',
+                background: showWind ? 'rgba(52,199,89,0.28)' : 'rgba(255,255,255,0.22)',
+                backdropFilter: 'blur(16px) saturate(180%)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'background 0.2s',
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M2 6h9a2 2 0 1 0-2-3.2" stroke={showWind ? '#34c759' : '#fff'} strokeWidth="1.6" strokeLinecap="round" fill="none" />
+                <path d="M2 10h12a2 2 0 1 1-2 3.2" stroke={showWind ? '#34c759' : '#fff'} strokeWidth="1.6" strokeLinecap="round" fill="none" />
+                <path d="M2 14h6" stroke={showWind ? '#34c759' : '#fff'} strokeWidth="1.6" strokeLinecap="round" fill="none" />
+              </svg>
+              <span style={{
+                position: 'absolute', top: 5, right: 5, width: 6, height: 6, borderRadius: '50%',
+                background: showWind ? '#34c759' : '#ff3b30', transition: 'background 0.2s',
+              }} />
+            </button>
+
+            <button
+              onClick={() => homeAp && setFiltersOpen(true)}
+              style={{
+                height: 48, padding: '0 24px',
+                borderRadius: 24, border: 'none',
+                background: homeAp ? '#0a84ff' : 'rgba(10,132,255,0.35)',
+                color: '#fff', fontSize: 14, fontWeight: 600, fontFamily: 'inherit',
+                cursor: homeAp ? 'pointer' : 'not-allowed',
+                display: 'flex', alignItems: 'center', gap: 7,
+                boxShadow: homeAp ? '0 4px 16px rgba(10,132,255,0.5)' : 'none',
+                whiteSpace: 'nowrap',
+                transition: 'background 0.2s, box-shadow 0.2s',
+              }}
+            >
+              ✦ Find my perfect plane
+            </button>
+
+            {/* Layer filter — square trigger, panel slides up from it */}
+            <div ref={layersRef} style={{ position: 'relative' }}>
+              <div style={{
+                position: 'absolute', bottom: 'calc(100% + 10px)', left: '50%',
+                transform: `translateX(-50%) translateY(${layersOpen ? 0 : 14}px)`,
+                opacity: layersOpen ? 1 : 0,
+                pointerEvents: layersOpen ? 'auto' : 'none',
+                transition: 'opacity 0.25s ease, transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)',
+                display: 'flex', flexDirection: 'column', gap: 8,
+                background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(20px) saturate(180%)',
+                borderRadius: 16, padding: 8,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+              }}>
+                {([
+                  ['airplane', '✈', 'Airplanes'],
+                  ['helicopter', '🚁', 'Helicopters'],
+                  ['jobs', '💼', 'Jobs'],
+                ] as [ 'airplane' | 'helicopter' | 'jobs', string, string][]).map(([key, icon, label]) => (
+                  <button key={key} onClick={() => toggleCat(key)} title={label}
+                    style={{
+                      width: 44, height: 44, borderRadius: 12, border: 'none', cursor: 'pointer', fontSize: 17,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: visibleCats[key] ? 'rgba(52,199,89,0.2)' : 'rgba(0,0,0,0.05)',
+                      opacity: visibleCats[key] ? 1 : 0.4,
+                      transition: 'all 0.15s',
+                    }}>
+                    {icon}
+                  </button>
+                ))}
+              </div>
+
+              <button onClick={() => setLayersOpen(o => !o)} title="Filter map layers"
+                style={{
+                  width: 48, height: 48, borderRadius: 14, border: 'none', cursor: 'pointer',
+                  background: layersOpen ? '#0a84ff' : 'rgba(255,255,255,0.22)',
+                  backdropFilter: 'blur(16px) saturate(180%)',
+                  boxShadow: layersOpen ? '0 4px 16px rgba(10,132,255,0.5)' : '0 2px 8px rgba(0,0,0,0.3)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'background 0.2s, box-shadow 0.2s',
+                }}>
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <line x1="3" y1="6" x2="17" y2="6" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
+                  <line x1="3" y1="10" x2="17" y2="10" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
+                  <line x1="3" y1="14" x2="17" y2="14" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
+                  <circle cx="7" cy="6" r="1.8" fill="#fff" />
+                  <circle cx="13" cy="10" r="1.8" fill="#fff" />
+                  <circle cx="9" cy="14" r="1.8" fill="#fff" />
+                </svg>
+              </button>
+            </div>
+          </div>
         </>
       )}
 

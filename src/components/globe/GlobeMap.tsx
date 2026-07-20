@@ -13,7 +13,8 @@ type WindUV   = WindPoint[] | null
 type ListingDot = {
   lon: number; lat: number; model: string; price: number | null; currency?: string | null
   condition?: string | null; reg?: string; location?: string; listingId?: string
-  category?: 'airplane' | 'helicopter' | 'gyrocopter' | 'trike'
+  category?: 'airplane' | 'helicopter' | 'gyrocopter' | 'trike' | 'job'
+  title?: string; company?: string; jobId?: string
 }
 
 // Info-badge color by listing condition
@@ -29,10 +30,31 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
 }
 
-function listingPopupHTML(
-  props: { model?: string; price?: number | null; currency?: string | null; condition?: string | null; reg?: string; location?: string; listingId?: string },
-  uid: string,
-): string {
+type DotProps = {
+  model?: string; price?: number | null; currency?: string | null; condition?: string | null
+  reg?: string; location?: string; listingId?: string
+  category?: string; title?: string; company?: string; jobId?: string
+}
+
+function jobPopupHTML(props: DotProps, uid: string): string {
+  const locStr = escapeHtml(props.location || '—')
+  const viewJobBtn = props.jobId
+    ? `<button onclick="event.stopPropagation();window.__ppSeeJob && window.__ppSeeJob('${escapeHtml(props.jobId)}')"
+        style="margin-top:12px;width:100%;height:34px;border-radius:9px;border:none;background:#bf5af2;color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">View job</button>`
+    : ''
+  return `
+    <div style="position:relative;background:rgba(30,35,45,0.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:0.5px solid rgba(255,255,255,0.12);border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,0.4);padding:14px 16px;min-width:200px;font-family:'Inter',-apple-system,sans-serif;">
+      <div style="font-size:11px;font-weight:700;color:#bf5af2;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:2px;">Job opening</div>
+      <div style="font-size:18px;font-weight:700;color:rgba(255,255,255,0.95);letter-spacing:-0.02em;">${escapeHtml(props.title ?? '')}</div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.55);margin-top:2px;">${escapeHtml(props.company ?? '')}</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:6px;">${locStr}</div>
+      ${viewJobBtn}
+    </div>
+  `
+}
+
+function listingPopupHTML(props: DotProps, uid: string): string {
+  if (props.category === 'job') return jobPopupHTML(props, uid)
   const color   = (props.condition && CONDITION_COLORS[props.condition]) || DEFAULT_CONDITION_COLOR
   const condStr = escapeHtml(props.condition || '—')
   const regStr  = escapeHtml(props.reg || '—')
@@ -75,6 +97,7 @@ type Props = {
   active?:           boolean
   listingDots?:      ListingDot[]
   onSeeOffer?:       (listingId: string) => void
+  onSeeJob?:         (jobId: string) => void
 }
 
 // ── Wind field grid ───────────────────────────────────────────
@@ -238,6 +261,9 @@ function dotsToGeoJSON(dots: ListingDot[]): GeoJSON.FeatureCollection {
           location: dot.location ?? '',
           listingId: dot.listingId ?? '',
           category: dot.category ?? 'airplane',
+          title: dot.title ?? '',
+          company: dot.company ?? '',
+          jobId: dot.jobId ?? '',
         },
       })
     })
@@ -285,11 +311,54 @@ function buildHeliIconData(size = 64): { width: number; height: number; data: Ui
   return { width: size, height: size, data: img.data }
 }
 
+// Job-opening dots get a briefcase sprite for the same reason (💼 is astral-plane too)
+function buildBriefcaseIconData(size = 64): { width: number; height: number; data: Uint8ClampedArray } {
+  const canvas = document.createElement('canvas')
+  canvas.width = size; canvas.height = size
+  const ctx = canvas.getContext('2d')!
+  const s = size / 64
+  ctx.strokeStyle = '#ffffff'
+  ctx.fillStyle   = '#ffffff'
+  ctx.lineCap     = 'round'
+  ctx.lineJoin    = 'round'
+  // Handle
+  ctx.lineWidth = 3.5 * s
+  ctx.beginPath()
+  ctx.moveTo(24 * s, 18 * s)
+  ctx.lineTo(24 * s, 10 * s)
+  ctx.quadraticCurveTo(24 * s, 6 * s, 28 * s, 6 * s)
+  ctx.lineTo(36 * s, 6 * s)
+  ctx.quadraticCurveTo(40 * s, 6 * s, 40 * s, 10 * s)
+  ctx.lineTo(40 * s, 18 * s)
+  ctx.stroke()
+  // Body (rounded rect)
+  const r = 5 * s, bx = 9 * s, by = 18 * s, bw = 46 * s, bh = 32 * s
+  ctx.beginPath()
+  ctx.moveTo(bx + r, by)
+  ctx.lineTo(bx + bw - r, by)
+  ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + r)
+  ctx.lineTo(bx + bw, by + bh - r)
+  ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - r, by + bh)
+  ctx.lineTo(bx + r, by + bh)
+  ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - r)
+  ctx.lineTo(bx, by + r)
+  ctx.quadraticCurveTo(bx, by, bx + r, by)
+  ctx.closePath()
+  ctx.fill()
+  // Latch notch + opening seam, cut out of the filled body for definition
+  ctx.globalCompositeOperation = 'destination-out'
+  ctx.fillRect(27 * s, 16 * s, 10 * s, 5 * s)
+  ctx.fillRect(bx, by + bh / 2 - 1 * s, bw, 2 * s)
+  ctx.globalCompositeOperation = 'source-over'
+  const img = ctx.getImageData(0, 0, size, size)
+  return { width: size, height: size, data: img.data }
+}
+
 // ── Component ─────────────────────────────────────────────────
 export default function GlobeMap({
   homeAp, routeDest, routeWaypoints, selACRange, windBR, windUV, windLevel = 'FL350',
   reachableAirports, allAirports, showWind, onMapLoad, active = true,
-  listingDots = [], onSeeOffer,
+  listingDots = [], onSeeOffer, onSeeJob,
 }: Props) {
   // Bridge for the raw-HTML mapbox popup button to reach back into React —
   // the popup content is plain HTML/onclick, not JSX, so it can't call props directly.
@@ -297,6 +366,11 @@ export default function GlobeMap({
     (window as any).__ppSeeOffer = (listingId: string) => onSeeOffer?.(listingId)
     return () => { delete (window as any).__ppSeeOffer }
   }, [onSeeOffer])
+
+  useEffect(() => {
+    (window as any).__ppSeeJob = (jobId: string) => onSeeJob?.(jobId)
+    return () => { delete (window as any).__ppSeeJob }
+  }, [onSeeJob])
 
   const containerRef    = useRef<HTMLDivElement>(null)
   const canvasRef       = useRef<HTMLCanvasElement>(null)
@@ -418,24 +492,25 @@ export default function GlobeMap({
       // Big and easy to spot from a world view, then shrink as you zoom in for
       // precise pinpointing (inverse of a normal marker — dots start large and
       // taper down instead of growing).
-      if (!map.hasImage('heli-icon')) map.addImage('heli-icon', buildHeliIconData(64), { pixelRatio: 2 })
+      if (!map.hasImage('heli-icon'))       map.addImage('heli-icon', buildHeliIconData(64), { pixelRatio: 2 })
+      if (!map.hasImage('briefcase-icon'))  map.addImage('briefcase-icon', buildBriefcaseIconData(64), { pixelRatio: 2 })
 
       map.addSource('listings', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
       map.addLayer({
         id: 'listing-dots', type: 'circle', source: 'listings',
         paint: {
           'circle-radius':       ['interpolate', ['linear'], ['zoom'], 1, 0, 1.8, 8, 4, 8.5, 7, 9, 10, 9.5, 14, 10, 18, 10.5],
-          'circle-color':        ['case', ['==', ['get', 'category'], 'helicopter'], '#ff9f0a', '#30d158'],
+          'circle-color':        ['case', ['==', ['get', 'category'], 'helicopter'], '#ff9f0a', ['==', ['get', 'category'], 'job'], '#bf5af2', '#30d158'],
           'circle-stroke-width': 2,
           'circle-stroke-color': '#ffffff',
           'circle-opacity':      ['step', ['zoom'], 0, 1.8, 1],
           'circle-stroke-opacity': ['step', ['zoom'], 0, 1.8, 1],
         },
       })
-      // Small airplane glyph centered inside non-helicopter listing dots
+      // Small airplane glyph centered inside airplane/gyrocopter/trike listing dots
       map.addLayer({
         id: 'listing-plane-icons', type: 'symbol', source: 'listings',
-        filter: ['!=', ['get', 'category'], 'helicopter'],
+        filter: ['!', ['in', ['get', 'category'], ['literal', ['helicopter', 'job']]]],
         layout: {
           'text-field':          '✈',
           'text-font':           ['Arial Unicode MS Regular'],
@@ -465,13 +540,28 @@ export default function GlobeMap({
           'icon-opacity': ['step', ['zoom'], 0, 1.8, 1],
         },
       })
+      // Job-opening icon (canvas briefcase sprite — 💼 is also outside Mapbox's glyph range)
+      map.addLayer({
+        id: 'listing-job-icons', type: 'symbol', source: 'listings',
+        filter: ['==', ['get', 'category'], 'job'],
+        layout: {
+          'icon-image':             'briefcase-icon',
+          'icon-size':              ['interpolate', ['linear'], ['zoom'], 1, 0, 1.8, 0.32, 4, 0.33, 7, 0.34, 10, 0.36, 14, 0.39, 18, 0.41],
+          'icon-anchor':            'center',
+          'icon-allow-overlap':     true,
+          'icon-ignore-placement':  true,
+        },
+        paint: {
+          'icon-opacity': ['step', ['zoom'], 0, 1.8, 1],
+        },
+      })
 
       // Listing dot click → tooltip card popup
       map.on('click', 'listing-dots', (e) => {
         const feature = e.features?.[0]
         if (!feature || feature.geometry.type !== 'Point') return
         const coords = feature.geometry.coordinates.slice() as [number, number]
-        const props  = feature.properties as { model?: string; price?: number | null; currency?: string | null; condition?: string | null; reg?: string; location?: string; listingId?: string }
+        const props  = feature.properties as DotProps
         const uid    = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`
 
         listingPopupRef.current?.remove()

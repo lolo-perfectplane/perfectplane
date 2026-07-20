@@ -12,7 +12,7 @@ import Header from './ui/Header'
 import LeftPanel from './ui/LeftPanel'
 import RightPanel from './ui/RightPanel'
 import MarketTab from './ui/MarketTab'
-import JobTab from './ui/JobTab'
+import JobTab, { type Job } from './ui/JobTab'
 import AuthModal from './ui/AuthModal'
 import { SellModal, AdminModal, ContactModal, MyItemsModal } from './listings/Modals'
 import MobileShell from './mobile/MobileShell'
@@ -34,13 +34,17 @@ function windLevelForType(type: 'jet' | 'turbo' | 'piston' | undefined): string 
 }
 
 // ── Interactive HUD bar ───────────────────────────────────────
-function HudBar({ homeAp, selAC, showWind, windLevel, onWindToggle, onWindFetch }: {
+type DotCategory = 'airplane' | 'helicopter' | 'jobs'
+
+function HudBar({ homeAp, selAC, showWind, windLevel, onWindToggle, onWindFetch, visibleCats, onToggleCat }: {
   homeAp: APEntry | null
   selAC: typeof AC[0] | null
   showWind: boolean
   windLevel: string
   onWindToggle: (v: boolean) => void
   onWindFetch: () => void
+  visibleCats: Record<DotCategory, boolean>
+  onToggleCat: (k: DotCategory) => void
 }) {
   const handleWindToggle = () => {
     const next = !showWind
@@ -94,7 +98,7 @@ function HudBar({ homeAp, selAC, showWind, windLevel, onWindToggle, onWindFetch 
       {/* Winds toggle — clickable, fixed at FL350 */}
       <div
         onClick={handleWindToggle}
-        style={{ ...hudCell, cursor: 'pointer', borderRight: 'none', borderRadius: '0 18px 18px 0', userSelect: 'none',
+        style={{ ...hudCell, cursor: 'pointer', userSelect: 'none',
           background: showWind ? 'rgba(52,199,89,0.1)' : 'transparent',
           transition: 'background 0.2s',
         }}
@@ -110,6 +114,27 @@ function HudBar({ homeAp, selAC, showWind, windLevel, onWindToggle, onWindFetch 
           }} />
           {showWind ? 'ON' : 'OFF'}
         </span>
+      </div>
+
+      {/* Dot layer toggles — show/hide airplane, helicopter and job pins on the globe */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 12px', borderRadius: '0 18px 18px 0' }}>
+        {([
+          ['airplane', '✈', 'Airplanes'],
+          ['helicopter', '🚁', 'Helicopters'],
+          ['jobs', '💼', 'Jobs'],
+        ] as [DotCategory, string, string][]).map(([key, icon, label]) => (
+          <button key={key} onClick={() => onToggleCat(key)} title={visibleCats[key] ? `Hide ${label}` : `Show ${label}`}
+            style={{
+              width: 32, height: 32, borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 15,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: visibleCats[key] ? 'rgba(52,199,89,0.16)' : 'rgba(255,255,255,0.05)',
+              color: '#fff',
+              opacity: visibleCats[key] ? 1 : 0.35,
+              transition: 'all 0.15s',
+            }}>
+            {icon}
+          </button>
+        ))}
       </div>
     </div>
   )
@@ -156,6 +181,19 @@ function resolveListingDots(listings: import('@/lib/supabase').Listing[]) {
     return []
   })
   return dots
+}
+
+// Job pins — the location field always comes from AirportPicker now, so lat/lon
+// are captured directly at posting time (same as listings), no text-parsing needed.
+function resolveJobDots(jobs: Job[]) {
+  return jobs
+    .filter(j => j.lat != null && j.lon != null)
+    .map(j => ({
+      lon: j.lon as number, lat: j.lat as number,
+      model: '', price: null as number | null,
+      category: 'job' as const,
+      title: j.title, company: j.company, location: j.location, jobId: j.id,
+    }))
 }
 
 function gcDist(la1: number, lo1: number, la2: number, lo2: number) {
@@ -210,9 +248,26 @@ export default function AppShell({ initialListings }: { initialListings: Listing
   const [unreadCount,  setUnreadCount]  = useState(0)
   const [openListingId, setOpenListingId] = useState<string | null>(null)
   const [favoriteIds,  setFavoriteIds]  = useState<Set<string>>(new Set())
+  const [jobs,         setJobs]         = useState<Job[]>([])
+  const [visibleCats,  setVisibleCats]  = useState<Record<'airplane' | 'helicopter' | 'jobs', boolean>>({ airplane: true, helicopter: true, jobs: true })
 
   const requestAuth = (message?: string) => { setAuthMessage(message); setModal('auth') }
   const handleSeeOffer = (listingId: string) => { setOpenListingId(listingId); setTab('market') }
+  const handleSeeJob = () => { setTab('jobs') }
+  const toggleCat = (k: 'airplane' | 'helicopter' | 'jobs') => setVisibleCats(prev => ({ ...prev, [k]: !prev[k] }))
+
+  // Job pins on the globe — fetched once client-side, mirrors how listings are refreshed
+  useEffect(() => {
+    fetch('/api/jobs')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.jobs) setJobs(d.jobs) })
+      .catch(() => {})
+  }, [])
+
+  const visibleGlobeDots = [
+    ...resolveListingDots(listings).filter(d => visibleCats[d.category === 'helicopter' ? 'helicopter' : 'airplane']),
+    ...(visibleCats.jobs ? resolveJobDots(jobs) : []),
+  ]
 
   // Restore the signed-in user from Supabase's persisted session on load —
   // the session itself already survives reloads (localStorage, ~1 week,
@@ -423,6 +478,7 @@ export default function AppShell({ initialListings }: { initialListings: Listing
         user={user} setUser={setUser}
         windBR={windBR} windUV={windUV} showWind={showWind}
         listings={listings}
+        jobs={jobs}
         onHomeAP={handleHomeAP}
         onHomeAirportSelect={handleHomeAirportSelect}
         onRoutCalc={handleRoutCalc}
@@ -457,9 +513,10 @@ export default function AppShell({ initialListings }: { initialListings: Listing
           windParticles={[]}
           active={tab === 'globe'}
           onMapLoad={() => {}}
-          listingDots={resolveListingDots(listings)}
+          listingDots={visibleGlobeDots}
           routeWaypoints={routeWaypoints}
           onSeeOffer={handleSeeOffer}
+          onSeeJob={handleSeeJob}
         />
       </div>
 
@@ -518,6 +575,8 @@ export default function AppShell({ initialListings }: { initialListings: Listing
             windLevel={windLevel}
             onWindToggle={v => { setShowWind(v); if (!v) { setWindBR(null); setWindUV(null) } }}
             onWindFetch={() => fetchWind(windLevel)}
+            visibleCats={visibleCats}
+            onToggleCat={toggleCat}
           />
         </>
       )}
