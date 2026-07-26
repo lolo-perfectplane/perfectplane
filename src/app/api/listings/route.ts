@@ -3,25 +3,27 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
 import { getVerifiedUserId } from '@/lib/auth-server'
 import { sendListingSubmitted } from '@/lib/email'
-import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
+import { checkRateLimit } from '@/lib/rateLimit'
 import { CURRENCIES } from '@/lib/currency'
 
 // POST /api/listings — submit a new listing (pending)
 export async function POST(req: NextRequest) {
   try {
-    if (!(await checkRateLimit(`listings-post:${getClientIp(req)}`, 10, 3600))) {
+    const sellerId = await getVerifiedUserId(req)
+    if (!sellerId) return NextResponse.json({ error: 'Not authorized' }, { status: 401 })
+    if (!(await checkRateLimit(`listings-post:${sellerId}`, 10, 3600))) {
       return NextResponse.json({ error: 'Too many requests — please try again later.' }, { status: 429 })
     }
 
     const body = await req.json()
     const {
       model, year, reg, hours, price, currency, location, lat, lon,
-      equip, condition, ifr, contact_pref, contactEmail, sellerId, sellerName, photos,
+      equip, condition, ifr, contact_pref, contactEmail, sellerName, photos,
       certificationRequested, engineTimes, propTimes, timeBasis, description,
       airframeNotes, engineNotes, interiorNotes, exteriorNotes, priceOnEnquiry,
     } = body
 
-    if (!model || !year || !reg || !hours || !location || !sellerId || (!price && !priceOnEnquiry)) {
+    if (!model || !year || !reg || !hours || !location || (!price && !priceOnEnquiry)) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 

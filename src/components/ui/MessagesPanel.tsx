@@ -26,6 +26,8 @@ type Props = {
 export default function MessagesPanel({ userId, onClose, onOpenConversation }: Props) {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [loading, setLoading] = useState(true)
+  const [confirmDel, setConfirmDel] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -75,6 +77,19 @@ export default function MessagesPanel({ userId, onClose, onOpenConversation }: P
     })()
     return () => { active = false }
   }, [userId])
+
+  const deleteConversation = async (listingId: string) => {
+    setDeleting(listingId)
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('messages')
+      .delete()
+      .eq('listing_id', listingId)
+      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+    setDeleting(null)
+    setConfirmDel(null)
+    if (!error) setConversations(prev => prev.filter(c => c.listingId !== listingId))
+  }
 
   return (
     <>
@@ -130,13 +145,43 @@ export default function MessagesPanel({ userId, onClose, onOpenConversation }: P
                 <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em' }}>
                   {c.year} {c.model}
                 </div>
-                {c.unread > 0 && (
-                  <span style={{
-                    minWidth: 18, height: 18, borderRadius: 9, background: '#ff3b30', color: '#fff',
-                    fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    padding: '0 5px', flexShrink: 0,
-                  }}>{c.unread}</span>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                  {c.unread > 0 && (
+                    <span style={{
+                      minWidth: 18, height: 18, borderRadius: 9, background: '#ff3b30', color: '#fff',
+                      fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      padding: '0 5px', flexShrink: 0,
+                    }}>{c.unread}</span>
+                  )}
+                  {confirmDel === c.listingId ? (
+                    <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 4 }}>
+                      <button
+                        onClick={() => deleteConversation(c.listingId)}
+                        disabled={deleting === c.listingId}
+                        style={{
+                          height: 22, padding: '0 8px', borderRadius: 100, border: 'none',
+                          background: '#ff3b30', color: '#fff', fontSize: 10, fontWeight: 700,
+                          fontFamily: 'inherit', cursor: deleting === c.listingId ? 'default' : 'pointer',
+                        }}>
+                        {deleting === c.listingId ? '…' : 'Confirm'}
+                      </button>
+                      <button onClick={() => setConfirmDel(null)} style={{
+                        height: 22, width: 22, borderRadius: '50%', border: 'none',
+                        background: 'rgba(118,118,128,0.15)', color: '#86868b', fontSize: 11,
+                        fontFamily: 'inherit', cursor: 'pointer',
+                      }}>✕</button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={e => { e.stopPropagation(); setConfirmDel(c.listingId) }}
+                      title="Delete conversation"
+                      style={{
+                        width: 22, height: 22, borderRadius: '50%', border: 'none',
+                        background: 'transparent', color: '#86868b', fontSize: 13,
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>🗑</button>
+                  )}
+                </div>
               </div>
               <div style={{ fontSize: 12, color: '#86868b', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {c.lastMessage}

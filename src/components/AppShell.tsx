@@ -23,6 +23,7 @@ import MessagesPanel from './ui/MessagesPanel'
 import DesktopProfile from './ui/DesktopProfile'
 import FavoritesTab from './ui/FavoritesTab'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { JOBS_ENABLED } from '@/lib/featureFlags'
 
 // Wind level is auto-selected from the chosen aircraft's cruise category —
 // jets sample the FL350 jet stream, turboprops FL180, pistons FL100.
@@ -121,7 +122,7 @@ function HudBar({ homeAp, selAC, showWind, windLevel, onWindToggle, onWindFetch,
         {([
           ['airplane', '✈', 'Airplanes'],
           ['helicopter', '🚁', 'Helicopters'],
-          ['jobs', '💼', 'Jobs'],
+          ...(JOBS_ENABLED ? [['jobs', '💼', 'Jobs'] as [DotCategory, string, string]] : []),
         ] as [DotCategory, string, string][]).map(([key, icon, label]) => (
           <button key={key} onClick={() => onToggleCat(key)} title={visibleCats[key] ? `Hide ${label}` : `Show ${label}`}
             style={{
@@ -258,6 +259,7 @@ export default function AppShell({ initialListings }: { initialListings: Listing
 
   // Job pins on the globe — fetched once client-side, mirrors how listings are refreshed
   useEffect(() => {
+    if (!JOBS_ENABLED) return
     fetch('/api/jobs')
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.jobs) setJobs(d.jobs) })
@@ -266,7 +268,7 @@ export default function AppShell({ initialListings }: { initialListings: Listing
 
   const visibleGlobeDots = [
     ...resolveListingDots(listings).filter(d => visibleCats[d.category === 'helicopter' ? 'helicopter' : 'airplane']),
-    ...(visibleCats.jobs ? resolveJobDots(jobs) : []),
+    ...(JOBS_ENABLED && visibleCats.jobs ? resolveJobDots(jobs) : []),
   ]
 
   // Restore the signed-in user from Supabase's persisted session on load —

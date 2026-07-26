@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
 import { getVerifiedUserId } from '@/lib/auth-server'
-import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 export async function GET() {
   const supabase = createServerClient()
@@ -23,14 +23,16 @@ const MAX_EXPIRY_DAYS = 365
 
 export async function POST(req: NextRequest) {
   try {
-    if (!(await checkRateLimit(`jobs-post:${getClientIp(req)}`, 10, 3600))) {
+    const posterId = await getVerifiedUserId(req)
+    if (!posterId) return NextResponse.json({ error: 'Not authorized' }, { status: 401 })
+    if (!(await checkRateLimit(`jobs-post:${posterId}`, 10, 3600))) {
       return NextResponse.json({ error: 'Too many requests — please try again later.' }, { status: 429 })
     }
 
     const body = await req.json()
-    const { title, company, location, lat, lon, jobType, functionTitle, region, description, requirements, salaryRange, contactEmail, posterId, posterName, minHoursTotal, minHoursCs25, minHoursCs23, minHoursPic, expiresInDays, logoUrl } = body
+    const { title, company, location, lat, lon, jobType, functionTitle, region, description, requirements, salaryRange, contactEmail, posterName, minHoursTotal, minHoursCs25, minHoursCs23, minHoursPic, expiresInDays, logoUrl } = body
 
-    if (!title || !company || !location || !description || !contactEmail || !posterId) {
+    if (!title || !company || !location || !description || !contactEmail) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 

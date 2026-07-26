@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
+import { authFetch } from '@/lib/authFetch'
 import AirportPicker, { type RemoteAirport } from '@/components/ui/AirportPicker'
 
 type User = { id: string; name: string; email: string; role: string }
@@ -107,7 +108,7 @@ export function PostJobModal({ user, onClose, onSuccess }: { user: User; onClose
     if (logoUploading) { setMsg({ text: 'Please wait for the logo to finish uploading.', ok: false }); return }
     setLoading(true); setMsg(null)
     try {
-      const r = await fetch('/api/jobs', {
+      const r = await authFetch('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -117,7 +118,7 @@ export function PostJobModal({ user, onClose, onSuccess }: { user: User; onClose
           minHoursTotal: minTotal || null, minHoursCs25: minCs25 || null,
           minHoursCs23: minCs23 || null, minHoursPic: minPic || null,
           expiresInDays: duration, logoUrl: logoUrl || null,
-          contactEmail: contact, posterId: user.id, posterName: user.name,
+          contactEmail: contact, posterName: user.name,
         }),
       })
       const d = await r.json()

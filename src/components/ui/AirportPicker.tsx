@@ -111,12 +111,6 @@ export default function AirportPicker({
               <span style={{ fontSize: 12, fontWeight: 700, color: '#0a84ff', fontVariantNumeric: 'tabular-nums', minWidth: 38 }}>{ap.icao}</span>
               <span style={{ fontSize: 13, color: '#1d1d1f', flex: 1 }}>{ap.name}</span>
               {ap.iata && <span style={{ fontSize: 11, color: '#86868b' }}>{ap.iata}</span>}
-              {!ap.verified && (
-                <span title="Bulk-imported data — fuel/IFR/customs are unverified estimates, not AIP data"
-                  style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 100, background: 'rgba(255,159,10,0.15)', color: '#b07800', flexShrink: 0 }}>
-                  ⚠ TO VERIFY
-                </span>
-              )}
             </div>
           ))}
         </div>

@@ -1,6 +1,7 @@
 // src/app/api/ai-listings/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 const MAX_PROMPT_CHARS = 2000
 
@@ -14,6 +15,12 @@ export async function POST(req: NextRequest) {
     const supabase = createServerClient()
     const { data: { user }, error: authErr } = await supabase.auth.getUser(token)
     if (authErr || !user) return NextResponse.json({ error: 'Not authorized' }, { status: 401 })
+
+    // This proxies to the paid Anthropic API — rate-limit per user so a
+    // compromised or scripted account can't run up the API bill.
+    if (!(await checkRateLimit(`ai-listings:${user.id}`, 15, 3600))) {
+      return NextResponse.json({ error: 'Too many requests — please try again later.' }, { status: 429 })
+    }
 
     const { prompt } = await req.json()
     if (!prompt || typeof prompt !== 'string') {

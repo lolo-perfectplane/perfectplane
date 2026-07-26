@@ -1,5 +1,6 @@
 'use client'
 // src/components/ui/Header.tsx
+import { JOBS_ENABLED } from '@/lib/featureFlags'
 
 type Props = {
   activeTab: 'globe' | 'market' | 'jobs' | 'profile' | 'favorites'
@@ -24,7 +25,7 @@ export default function Header({ activeTab, onTabChange, user, onAuthClick, onPr
 
       {/* 3-tab segmented control */}
       <div className="pp-seg">
-        {([['globe', 'Globe'], ['market', 'Market'], ['jobs', 'Jobs']] as const).map(([t, label]) => (
+        {([['globe', 'Globe'], ['market', 'Market'], ...(JOBS_ENABLED ? [['jobs', 'Jobs'] as const] : [])] as const).map(([t, label]) => (
           <div
             key={t}
             className={`pp-seg-item${activeTab === t ? ' active' : ''}`}

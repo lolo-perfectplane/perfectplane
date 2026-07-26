@@ -123,7 +123,7 @@ export function SellModal({ user, onClose, onSuccess }: SellProps) {
     }
     setLoading(true); setMsg(null)
     try {
-      const r = await fetch('/api/listings', {
+      const r = await authFetch('/api/listings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -137,7 +137,7 @@ export function SellModal({ user, onClose, onSuccess }: SellProps) {
           condition: cond,
           ifr,
           contact_pref: contactPref,
-          contactEmail: contact, sellerId: user.id,
+          contactEmail: contact,
           sellerName: user.name, sellerEmail: user.email,
           photos: photos.filter(Boolean),
           certificationRequested: certReq,

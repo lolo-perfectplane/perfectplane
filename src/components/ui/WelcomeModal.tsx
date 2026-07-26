@@ -11,11 +11,12 @@ const STEPS: Step[] = [
   { icon: '🏠', title: 'Set your home airport', body: 'Type any ICAO or IATA code (e.g. LFPG, JFK, EGLL) to anchor your range rings on the globe.' },
   { icon: '🎚', title: 'Configure your mission', body: 'Set your budget or, in simple mode, just your hours flown per year and total budget — the app splits fixed and hourly costs for you. Passengers and desired range round out the search.' },
   { icon: '🧭', title: 'Plan a multi-stop route', body: 'Add stopovers to your route — PerfectPlane computes the legs automatically and draws the full route on the globe, with your stopovers and destination marked.' },
-  { icon: '✦', title: 'Find my aircraft', body: 'Hit this button to run the matching algorithm across 488 aircraft. Results are scored and ranked instantly.' },
+  { icon: '✦', title: 'Find my aircraft', body: 'Hit this button to run the matching algorithm across 2,000+ aircraft — airplanes, helicopters, gyrocopters and trikes. Results are scored and ranked instantly.' },
   { icon: '🛩', title: 'Your matches', body: "Each card shows range, speed, capacity and a match score. Click an aircraft to see its range ring on the globe. Click 'See offers' to browse listings." },
-  { icon: '⚖', title: 'Compare aircraft', body: 'In the Market tab, tap "Compare" on up to 3 listings to see them side by side — price, performance, condition and more, with the best value highlighted.' },
-  { icon: '💨', title: 'Live HUD', body: 'The HUD at the bottom shows your position, selected aircraft and range. Toggle winds ON to see jet-stream adjusted range rings in real time.' },
-  { icon: '🛒', title: 'Market & Fleet', body: 'Switch to Market to browse or list aircraft for free. Fleet tab lets you track your own aircraft, costs and maintenance.' },
+  { icon: '🚁', title: 'Categories on the globe', body: 'Listings show up as color-coded dots — green for airplanes, orange for helicopters. Use the layer toggle on the HUD to show or hide each category.' },
+  { icon: '⚖', title: 'Compare aircraft', body: 'In the Market tab, tap "Compare" on up to 3 listings to see them side by side — price, performance, condition and more, with the best value highlighted, even across different currencies.' },
+  { icon: '💨', title: 'Live HUD', body: 'The HUD shows your position, selected aircraft and range. Toggle winds ON to see jet-stream adjusted range rings in real time.' },
+  { icon: '🛒', title: 'Market', body: 'Switch to Market to browse or list your aircraft for free. Filter by category (airplane, helicopter, gyrocopter, trike), engine type, fuel and landing gear to find exactly what you need.' },
 ]
 
 const CARD_STYLE: React.CSSProperties = {

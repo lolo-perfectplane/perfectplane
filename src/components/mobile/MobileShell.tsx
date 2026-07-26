@@ -21,6 +21,7 @@ import MessageModal, { type MessageListing } from '@/components/ui/MessageModal'
 import MessagesPanel from '@/components/ui/MessagesPanel'
 import MobileFavorites from './MobileFavorites'
 import MobileJobsView from './MobileJobsView'
+import { JOBS_ENABLED } from '@/lib/featureFlags'
 
 const GlobeMap = dynamic(() => import('@/components/globe/GlobeMap'), { ssr: false })
 
@@ -220,7 +221,7 @@ export default function MobileShell(props: MobileShellProps) {
   const tabs: { key: MobileTab; label: string; icon: string }[] = [
     { key: 'globe',   label: 'Globe',   icon: '🌍' },
     { key: 'market',  label: 'Market',  icon: '🛒' },
-    { key: 'jobs',    label: 'Jobs',    icon: '✈️'  },
+    ...(JOBS_ENABLED ? [{ key: 'jobs' as const, label: 'Jobs', icon: '✈️' }] : []),
     { key: 'profile', label: 'Profile', icon: '🧑‍✈️' },
   ]
 
@@ -305,7 +306,7 @@ export default function MobileShell(props: MobileShellProps) {
           onMapLoad={() => {}}
           listingDots={[
             ...resolveListingDots(listings).filter(d => visibleCats[d.category === 'helicopter' ? 'helicopter' : 'airplane']),
-            ...(visibleCats.jobs ? resolveJobDots(jobs) : []),
+            ...(JOBS_ENABLED && visibleCats.jobs ? resolveJobDots(jobs) : []),
           ]}
           onSeeOffer={handleSeeOffer}
           onSeeJob={handleSeeJob}
@@ -427,7 +428,7 @@ export default function MobileShell(props: MobileShellProps) {
                 {([
                   ['airplane', '✈', 'Airplanes'],
                   ['helicopter', '🚁', 'Helicopters'],
-                  ['jobs', '💼', 'Jobs'],
+                  ...(JOBS_ENABLED ? [['jobs', '💼', 'Jobs'] as ['jobs', string, string]] : []),
                 ] as [ 'airplane' | 'helicopter' | 'jobs', string, string][]).map(([key, icon, label]) => (
                   <button key={key} onClick={() => toggleCat(key)} title={label}
                     style={{
