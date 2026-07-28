@@ -92,6 +92,8 @@ export async function PATCH(req: NextRequest) {
         contact_email: edits.contact_email,
         certified:     !!edits.certified,
         ifr:           !!edits.ifr,
+        source_url:    edits.source_url  || null,
+        source_name:   edits.source_name || null,
         ...(Array.isArray(edits.photos) && { photos: edits.photos }),
       }).eq('id', listingId)
       if (error) throw error

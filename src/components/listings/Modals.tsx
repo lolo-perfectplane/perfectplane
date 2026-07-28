@@ -526,8 +526,8 @@ function PhotoUploader({ userId, photos, onChange }: {
                     </div>
                   )}
                   {!s.uploading && !s.remoteUrl && (
-                    <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ fontSize: 11, color: '#ff3b30', fontWeight: 500 }}>Upload failed</span>
+                    <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px' }}>
+                      <span style={{ fontSize: 10, color: '#ff453a', fontWeight: 500, textAlign: 'center' }}>{s.error || 'Upload failed'}</span>
                     </div>
                   )}
                 </>
@@ -855,6 +855,19 @@ export function AdminModal({ userId, onClose, onApproved }: AdminProps) {
               <div style={{ marginBottom: 8 }}>
                 <label style={editLbl}>Equipment</label>
                 <input style={editInp} value={editData.equip ?? ''} onChange={e => setEditData((d: any) => ({ ...d, equip: e.target.value }))} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8, background: 'rgba(191,90,242,0.06)', border: '0.5px solid rgba(191,90,242,0.2)', borderRadius: 8, padding: 8 }}>
+                <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, color: '#bf5af2', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  External listing (optional) — links out instead of contact/message
+                </div>
+                <div>
+                  <label style={editLbl}>Source URL</label>
+                  <input style={editInp} type="url" placeholder="https://…" value={editData.source_url ?? ''} onChange={e => setEditData((d: any) => ({ ...d, source_url: e.target.value }))} />
+                </div>
+                <div>
+                  <label style={editLbl}>Source website name</label>
+                  <input style={editInp} placeholder="e.g. Controller.com" value={editData.source_name ?? ''} onChange={e => setEditData((d: any) => ({ ...d, source_name: e.target.value }))} />
+                </div>
               </div>
               <div style={{ display: 'flex', gap: 16, marginBottom: 10 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>

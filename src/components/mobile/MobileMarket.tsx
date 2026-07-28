@@ -491,7 +491,20 @@ function ListingSheet({ listing, onClose, onContact, user, onAuthRequired, onOpe
             ))}
 
             {/* Contact button */}
-            {pref === 'email' ? (
+            {listing.source_url ? (
+              <a href={listing.source_url} target="_blank" rel="noopener noreferrer" style={{
+                width: '100%', height: 50, background: '#0a84ff', border: 'none',
+                borderRadius: 14, color: '#fff', fontFamily: 'inherit',
+                fontSize: 16, fontWeight: 600, cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(10,132,255,0.35)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                textDecoration: 'none', boxSizing: 'border-box',
+                marginTop: 4,
+                marginBottom: `calc(${TAB_H}px + env(safe-area-inset-bottom, 0px))`,
+              }}>
+                See on {listing.source_name || 'source site'} ↗
+              </a>
+            ) : pref === 'email' ? (
               <button onClick={() => { onContact(listing); close() }} style={{
                 width: '100%', height: 50, background: '#0a84ff', border: 'none',
                 borderRadius: 14, color: '#fff', fontFamily: 'inherit',

@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
   // messages to the seller when contact_pref is 'message'.
   let query = supabase
     .from('listings')
-    .select('id,model,year,reg,hours,price,price_on_enquiry,currency,location,lat,lon,equip,condition,ifr,contact_pref,seller_id,type_rating,photos,approved_at,seller_name,certified,certification_requested,engine_times,prop_times,time_basis,description,airframe_notes,engine_notes,interior_notes,exterior_notes')
+    .select('id,model,year,reg,hours,price,price_on_enquiry,currency,location,lat,lon,equip,condition,ifr,contact_pref,seller_id,type_rating,photos,approved_at,seller_name,certified,certification_requested,engine_times,prop_times,time_basis,description,airframe_notes,engine_notes,interior_notes,exterior_notes,source_url,source_name')
     .eq('status', 'approved')
   if (model) query = query.eq('model', model)
 

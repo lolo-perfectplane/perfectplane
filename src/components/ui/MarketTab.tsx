@@ -269,7 +269,17 @@ function ListingModal({ listing, onClose, onContact, user, onAuthRequired, onOpe
             </div>
           ))}
 
-          {pref === 'email' ? (
+          {listing.source_url ? (
+            <a href={listing.source_url} target="_blank" rel="noopener noreferrer" style={{
+              width: '100%', height: 50, background: '#0a84ff', border: 'none',
+              borderRadius: 14, color: '#fff', fontFamily: 'inherit', fontSize: 16,
+              fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 14px rgba(10,132,255,0.35)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              textDecoration: 'none', boxSizing: 'border-box',
+            }}>
+              See on {listing.source_name || 'source site'} ↗
+            </a>
+          ) : pref === 'email' ? (
             <button onClick={() => { onContact(listing); onClose() }} style={{
               width: '100%', height: 50, background: '#0a84ff', border: 'none',
               borderRadius: 14, color: '#fff', fontFamily: 'inherit', fontSize: 16,

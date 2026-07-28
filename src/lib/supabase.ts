@@ -53,6 +53,8 @@ export type Listing = {
   engine_notes: string | null
   interior_notes: string | null
   exterior_notes: string | null
+  source_url: string | null
+  source_name: string | null
 }
 
 export type Inquiry = {
