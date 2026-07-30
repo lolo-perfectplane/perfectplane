@@ -442,28 +442,18 @@ export default function MarketTab({ listings: initialListings, onContact, onSell
 
           {/* Search / sort / brand chips — single row */}
           <div style={{ padding: '10px 22px 10px', borderBottom: '0.5px solid rgba(0,0,0,0.06)', display: 'flex', gap: 7, alignItems: 'center', flexShrink: 0 }}>
-            {/* Brand chips on the left */}
-            {!showBrandGrid && brandCards.length > 0 && (
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
+            {/* Back button — returns to the brand grid */}
+            {brand ? (
+              <div style={{ flex: 1 }}>
                 <button onClick={() => setBrand('')} style={{
-                  height: 26, padding: '0 11px', borderRadius: 100, cursor: 'pointer', fontFamily: 'inherit',
-                  fontSize: 11, fontWeight: 500,
-                  background: brand === '' ? '#1d1d1f' : 'transparent',
-                  border: brand === '' ? 'none' : '0.5px solid rgba(0,0,0,0.12)',
-                  color: brand === '' ? '#fff' : '#86868b',
-                }}>All brands</button>
-                {brandCards.map(({ brand: b }) => (
-                  <button key={b} onClick={() => setBrand(brand === b ? '' : b)} style={{
-                    height: 26, padding: '0 11px', borderRadius: 100, cursor: 'pointer', fontFamily: 'inherit',
-                    fontSize: 11, fontWeight: 500,
-                    background: brand === b ? '#1d1d1f' : 'transparent',
-                    border: brand === b ? 'none' : '0.5px solid rgba(0,0,0,0.12)',
-                    color: brand === b ? '#fff' : '#86868b',
-                  }}>{b}</button>
-                ))}
+                  height: 26, padding: '0 12px', borderRadius: 100, cursor: 'pointer', fontFamily: 'inherit',
+                  fontSize: 11, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 5,
+                  background: 'transparent', border: '0.5px solid rgba(0,0,0,0.12)', color: '#1d1d1f',
+                }}>← Back</button>
               </div>
+            ) : (
+              <div style={{ flex: 1 }} />
             )}
-            {showBrandGrid && <div style={{ flex: 1 }} />}
             {/* Search + sort on the right */}
             <input value={search} placeholder="Search model or reg…"
               onChange={e => { setSearch(e.target.value); onSearchChange?.(e.target.value) }}

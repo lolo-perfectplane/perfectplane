@@ -581,6 +581,7 @@ export default function MobileShell(props: MobileShellProps) {
         onSelect={onSelectAC}
         onOffers={ac => { openOffers(ac); setResultsOpen(false); setActiveTab('market') }}
         windBR={windBR}
+        listings={listings}
       />
 
       {/* ── Modals ── */}

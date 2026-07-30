@@ -2,6 +2,7 @@
 // src/components/ui/RightPanel.tsx
 import { useState } from 'react'
 import { AC } from '@/lib/aircraft'
+import type { Listing } from '@/lib/supabase'
 
 type Props = {
   results: (typeof AC[0] & { sc: number })[]
@@ -11,17 +12,26 @@ type Props = {
   windBR: number[] | null
   homeAp: { icao: string } | null
   wGrid: null
+  listings?: Listing[]
 }
 
 type Sort = 'match' | 'price_asc' | 'price_desc' | 'range_asc' | 'range_desc' | 'hr_asc' | 'hr_desc' | 'speed_asc' | 'speed_desc'
 
-export default function RightPanel({ results, selAC, onSelect, onOffers, windBR }: Props) {
+export default function RightPanel({ results, selAC, onSelect, onOffers, windBR, listings = [] }: Props) {
   const [search, setSearch] = useState('')
   const [sort,   setSort]   = useState<Sort>('match')
+
+  const offerCounts = new Map<string, number>()
+  for (const l of listings) offerCounts.set(l.model, (offerCounts.get(l.model) ?? 0) + 1)
 
   const filtered = results
     .filter(a => a.name.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
+      // Aircraft with listed offers always come first, regardless of sort mode
+      const hasA = (offerCounts.get(a.name) ?? 0) > 0
+      const hasB = (offerCounts.get(b.name) ?? 0) > 0
+      if (hasA !== hasB) return hasA ? -1 : 1
+
       switch (sort) {
         case 'price_asc':  return a.initK - b.initK
         case 'price_desc': return b.initK - a.initK
@@ -123,11 +133,20 @@ export default function RightPanel({ results, selAC, onSelect, onOffers, windBR 
               </div>
 
               {/* Offers button */}
-              <button className="pp-offers-btn"
-                style={{ width: '100%', height: 34, borderRadius: 10, border: 'none', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-                onClick={e => { e.stopPropagation(); onOffers(ac) }}>
-                See offers
-              </button>
+              {(() => {
+                const offerCount = offerCounts.get(ac.name) ?? 0
+                return offerCount === 0 ? (
+                  <div style={{ width: '100%', height: 34, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600, color: '#86868b', background: 'rgba(118,118,128,0.08)' }}>
+                    0 listed
+                  </div>
+                ) : (
+                  <button className="pp-offers-btn"
+                    style={{ width: '100%', height: 34, borderRadius: 10, border: 'none', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                    onClick={e => { e.stopPropagation(); onOffers(ac) }}>
+                    See offers
+                  </button>
+                )
+              })()}
             </div>
           )
         })}

@@ -567,6 +567,7 @@ export default function AppShell({ initialListings }: { initialListings: Listing
             windBR={windBR}
             homeAp={homeAp}
             wGrid={null}
+            listings={listings}
           />
 
           {/* Interactive HUD */}

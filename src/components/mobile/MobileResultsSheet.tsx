@@ -2,6 +2,7 @@
 // src/components/mobile/MobileResultsSheet.tsx
 import { useState } from 'react'
 import { AC } from '@/lib/aircraft'
+import type { Listing } from '@/lib/supabase'
 import { useSwipeToClose } from './useSwipeToClose'
 
 type Sort = 'match' | 'price_asc' | 'price_desc' | 'range_asc' | 'range_desc' | 'hr_asc' | 'hr_desc' | 'speed_asc' | 'speed_desc'
@@ -14,16 +15,25 @@ type Props = {
   onSelect: (ac: typeof AC[0]) => void
   onOffers: (ac: typeof AC[0]) => void
   windBR: number[] | null
+  listings?: Listing[]
 }
 
-export default function MobileResultsSheet({ open, onClose, results, selAC, onSelect, onOffers, windBR }: Props) {
+export default function MobileResultsSheet({ open, onClose, results, selAC, onSelect, onOffers, windBR, listings = [] }: Props) {
   const [search, setSearch] = useState('')
   const [sort, setSort]     = useState<Sort>('match')
   const { dragY, handlers } = useSwipeToClose(onClose)
 
+  const offerCounts = new Map<string, number>()
+  for (const l of listings) offerCounts.set(l.model, (offerCounts.get(l.model) ?? 0) + 1)
+
   const filtered = results
     .filter(a => a.name.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
+      // Aircraft with listed offers always come first, regardless of sort mode
+      const hasA = (offerCounts.get(a.name) ?? 0) > 0
+      const hasB = (offerCounts.get(b.name) ?? 0) > 0
+      if (hasA !== hasB) return hasA ? -1 : 1
+
       switch (sort) {
         case 'price_asc':  return a.initK - b.initK
         case 'price_desc': return b.initK - a.initK
@@ -173,12 +183,18 @@ export default function MobileResultsSheet({ open, onClose, results, selAC, onSe
                 </div>
 
                 {/* Offers */}
-                <button
-                  onClick={e => { e.stopPropagation(); onOffers(ac) }}
-                  style={{ width: '100%', height: 38, borderRadius: 10, border: 'none', background: 'rgba(10,132,255,0.1)', color: '#0a84ff', fontSize: 14, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}
-                >
-                  See offers
-                </button>
+                {(offerCounts.get(ac.name) ?? 0) === 0 ? (
+                  <div style={{ width: '100%', height: 38, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(118,118,128,0.1)', color: '#86868b', fontSize: 14, fontWeight: 600 }}>
+                    0 listed
+                  </div>
+                ) : (
+                  <button
+                    onClick={e => { e.stopPropagation(); onOffers(ac) }}
+                    style={{ width: '100%', height: 38, borderRadius: 10, border: 'none', background: 'rgba(10,132,255,0.1)', color: '#0a84ff', fontSize: 14, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}
+                  >
+                    See offers
+                  </button>
+                )}
               </div>
             )
           })}
