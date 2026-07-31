@@ -305,7 +305,7 @@ export default function MobileShell(props: MobileShellProps) {
           active={activeTab === 'globe'}
           onMapLoad={() => {}}
           listingDots={[
-            ...resolveListingDots(listings).filter(d => visibleCats[d.category === 'helicopter' ? 'helicopter' : 'airplane']),
+            ...resolveListingDots(listings).filter(d => visibleCats[(d.category === 'helicopter' || d.category === 'gyrocopter') ? 'helicopter' : 'airplane']),
             ...(JOBS_ENABLED && visibleCats.jobs ? resolveJobDots(jobs) : []),
           ]}
           onSeeOffer={handleSeeOffer}

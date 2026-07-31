@@ -500,7 +500,7 @@ export default function GlobeMap({
         id: 'listing-dots', type: 'circle', source: 'listings',
         paint: {
           'circle-radius':       ['interpolate', ['linear'], ['zoom'], 1, 0, 1.8, 8, 4, 8.5, 7, 9, 10, 9.5, 14, 10, 18, 10.5],
-          'circle-color':        ['case', ['==', ['get', 'category'], 'helicopter'], '#ff9f0a', ['==', ['get', 'category'], 'job'], '#bf5af2', '#30d158'],
+          'circle-color':        ['case', ['in', ['get', 'category'], ['literal', ['helicopter', 'gyrocopter']]], '#ff9f0a', ['==', ['get', 'category'], 'job'], '#bf5af2', '#30d158'],
           'circle-stroke-width': 2,
           'circle-stroke-color': '#ffffff',
           'circle-opacity':      ['step', ['zoom'], 0, 1.8, 1],
@@ -510,7 +510,7 @@ export default function GlobeMap({
       // Small airplane glyph centered inside airplane/gyrocopter/trike listing dots
       map.addLayer({
         id: 'listing-plane-icons', type: 'symbol', source: 'listings',
-        filter: ['!', ['in', ['get', 'category'], ['literal', ['helicopter', 'job']]]],
+        filter: ['!', ['in', ['get', 'category'], ['literal', ['helicopter', 'gyrocopter', 'job']]]],
         layout: {
           'text-field':          '✈',
           'text-font':           ['Arial Unicode MS Regular'],
@@ -528,7 +528,7 @@ export default function GlobeMap({
       // Helicopter icon (canvas sprite — 🚁 is outside Mapbox's glyph range)
       map.addLayer({
         id: 'listing-heli-icons', type: 'symbol', source: 'listings',
-        filter: ['==', ['get', 'category'], 'helicopter'],
+        filter: ['in', ['get', 'category'], ['literal', ['helicopter', 'gyrocopter']]],
         layout: {
           'icon-image':             'heli-icon',
           'icon-size':              ['interpolate', ['linear'], ['zoom'], 1, 0, 1.8, 0.32, 4, 0.33, 7, 0.34, 10, 0.36, 14, 0.39, 18, 0.41],

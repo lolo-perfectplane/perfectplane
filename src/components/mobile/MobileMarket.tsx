@@ -486,7 +486,7 @@ function ListingSheet({ listing, onClose, onContact, user, onAuthRequired, onOpe
             ].filter(Boolean).map(([label, text]: any) => (
               <div key={label as string} style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>{label}</div>
-                <div style={{ fontSize: 14, color: '#1d1d1f', lineHeight: 1.5 }}>{text}</div>
+                <div style={{ fontSize: 14, color: '#1d1d1f', lineHeight: 1.5, whiteSpace: 'pre-line' }}>{text}</div>
               </div>
             ))}
 
@@ -542,6 +542,7 @@ function ListingSheet({ listing, onClose, onContact, user, onAuthRequired, onOpe
 export default function MobileMarket({ listings: initialListings, onContact, onSell, user, initialSearch = '', onAuthRequired, onOpenMessage, openListingId, onOpenListingHandled, favoriteIds, onToggleFavorite }: Props) {
   const [search,      setSearch]      = useState(initialSearch)
   const [brand,       setBrand]       = useState<string | null>(null)
+  const [showAll,     setShowAll]     = useState(false)
   const [listings,    setListings]    = useState<Listing[]>(initialListings)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [selListing,  setSelListing]  = useState<Listing | null>(null)
@@ -605,7 +606,7 @@ export default function MobileMarket({ listings: initialListings, onContact, onS
     .sort()
     .filter(b => preFiltered.some(l => l.model?.startsWith(b)))
 
-  const showBrandGrid = !search && !brand && brands.length > 0
+  const showBrandGrid = !search && !brand && !showAll && brands.length > 0
 
   const filtered = preFiltered
     .filter(l => !brand || l.model?.toLowerCase().startsWith(brand.toLowerCase()))
@@ -624,19 +625,19 @@ export default function MobileMarket({ listings: initialListings, onContact, onS
           <input
             value={search}
             placeholder="Search aircraft, model…"
-            onChange={e => { setSearch(e.target.value); setBrand(null) }}
+            onChange={e => { setSearch(e.target.value); setBrand(null); setShowAll(false) }}
             style={{ width: '100%', boxSizing: 'border-box', height: 40, padding: '0 14px 0 36px', borderRadius: 12, border: 'none', background: 'rgba(118,118,128,0.12)', fontFamily: 'inherit', fontSize: 16, outline: 'none' }}
           />
         </div>
 
-        {brand && (
+        {(brand || showAll) && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-            <span style={{ fontSize: 13, color: '#86868b' }}><b style={{ color: '#0a84ff' }}>{filtered.length}</b> {brand} aircraft</span>
-            <button onClick={() => setBrand(null)} style={{ height: 24, padding: '0 10px', borderRadius: 12, border: 'none', background: 'rgba(0,0,0,0.08)', color: '#86868b', fontSize: 12, fontFamily: 'inherit', cursor: 'pointer' }}>✕ Clear</button>
+            <span style={{ fontSize: 13, color: '#86868b' }}><b style={{ color: '#0a84ff' }}>{filtered.length}</b> {brand ? `${brand} aircraft` : 'aircraft'}</span>
+            <button onClick={() => { setBrand(null); setShowAll(false) }} style={{ height: 24, padding: '0 10px', borderRadius: 12, border: 'none', background: 'rgba(0,0,0,0.08)', color: '#86868b', fontSize: 12, fontFamily: 'inherit', cursor: 'pointer' }}>← Back</button>
           </div>
         )}
 
-        {!brand && !search && (
+        {!brand && !search && !showAll && (
           <div style={{ marginTop: 8, fontSize: 13, color: '#86868b' }}>
             {listings.length === 0 ? 'No listings' : <><b style={{ color: '#0a84ff' }}>{filtered.length}</b> aircraft{activeFilterCount > 0 ? ' matching filters' : ' for sale'}</>}
           </div>
@@ -650,6 +651,14 @@ export default function MobileMarket({ listings: initialListings, onContact, onS
         {showBrandGrid && brands.length > 0 && (
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Browse by brand</div>
+            <button onClick={() => setShowAll(true)} style={{
+              width: '100%', padding: '14px 8px', marginBottom: 10, borderRadius: 14,
+              border: '0.5px solid rgba(10,132,255,0.25)', background: 'rgba(10,132,255,0.06)',
+              cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: '#0a84ff' }}>See all listings</span>
+              <span style={{ fontSize: 12, color: '#0a84ff', opacity: 0.7 }}>({preFiltered.length})</span>
+            </button>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
               {brands.map(b => {
                 const count = preFiltered.filter(l => l.model?.split(' ')[0] === b).length

@@ -986,7 +986,7 @@ export function AdminModal({ userId, onClose, onApproved }: AdminProps) {
             ].filter(([v]) => v).map(([text, label]) => (
               <div key={label as string} style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>{label}</div>
-                <div style={{ fontSize: 14, color: '#1d1d1f', lineHeight: 1.6, background: 'rgba(118,118,128,0.05)', borderRadius: 10, padding: '10px 14px' }}>{text}</div>
+                <div style={{ fontSize: 14, color: '#1d1d1f', lineHeight: 1.6, background: 'rgba(118,118,128,0.05)', borderRadius: 10, padding: '10px 14px', whiteSpace: 'pre-line' }}>{text}</div>
               </div>
             ))}
             <div style={{ fontSize: 12, color: '#aeaeb2', marginTop: 6 }}>

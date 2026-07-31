@@ -265,7 +265,7 @@ function ListingModal({ listing, onClose, onContact, user, onAuthRequired, onOpe
           ].filter(([v]) => v).map(([text, label]) => (
             <div key={label as string} style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>{label}</div>
-              <div style={{ fontSize: 14, color: '#1d1d1f', lineHeight: 1.6, background: 'rgba(118,118,128,0.05)', borderRadius: 10, padding: '10px 14px' }}>{text}</div>
+              <div style={{ fontSize: 14, color: '#1d1d1f', lineHeight: 1.6, background: 'rgba(118,118,128,0.05)', borderRadius: 10, padding: '10px 14px', whiteSpace: 'pre-line' }}>{text}</div>
             </div>
           ))}
 
@@ -321,6 +321,7 @@ export default function MarketTab({ listings: initialListings, onContact, onSell
   const [sort,        setSort]        = useState<Sort>('newest')
   const [search,      setSearch]      = useState(initialSearch)
   const [brand,       setBrand]       = useState('')
+  const [showAll,     setShowAll]     = useState(false)
   const [selListing,  setSelListing]  = useState<Listing | null>(null)
   const [compareIds,  setCompareIds]  = useState<string[]>([])
   const [compareOpen, setCompareOpen] = useState(false)
@@ -335,7 +336,7 @@ export default function MarketTab({ listings: initialListings, onContact, onSell
   }
 
   const hasFilters = catFilter !== 'all' || typeFilter !== 'all' || engFilter !== 0 || fuelFilter || gearFilter || ifrOnly || maxHours < MAX_HOURS || yearFrom > 1960 || yearTo < CURRENT_YEAR || !!brand || !!search
-  const clearAll = () => { setCatFilter('all'); setTypeFilter('all'); setEngFilter(0); setFuelFilter(null); setGearFilter(null); setIfrOnly(false); setMaxHours(MAX_HOURS); setYearFrom(1960); setYearTo(CURRENT_YEAR); setBrand(''); setSearch(''); onSearchChange?.('') }
+  const clearAll = () => { setCatFilter('all'); setTypeFilter('all'); setEngFilter(0); setFuelFilter(null); setGearFilter(null); setIfrOnly(false); setMaxHours(MAX_HOURS); setYearFrom(1960); setYearTo(CURRENT_YEAR); setBrand(''); setSearch(''); setShowAll(false); onSearchChange?.('') }
 
   // Sync when parent navigates here with a pre-filled search (e.g. "See offers")
   useEffect(() => { setSearch(initialSearch) }, [initialSearch])
@@ -374,7 +375,7 @@ export default function MarketTab({ listings: initialListings, onContact, onSell
     .map(b => ({ brand: b, count: preFiltered.filter(l => l.model.startsWith(b)).length }))
     .filter(({ count }) => count > 0)
 
-  const showBrandGrid = !search && !brand && brandCards.length > 0
+  const showBrandGrid = !search && !brand && !showAll && brandCards.length > 0
 
   const filtered = preFiltered
     .filter(l => !brand || l.model.startsWith(brand))
@@ -443,9 +444,9 @@ export default function MarketTab({ listings: initialListings, onContact, onSell
           {/* Search / sort / brand chips — single row */}
           <div style={{ padding: '10px 22px 10px', borderBottom: '0.5px solid rgba(0,0,0,0.06)', display: 'flex', gap: 7, alignItems: 'center', flexShrink: 0 }}>
             {/* Back button — returns to the brand grid */}
-            {brand ? (
+            {(brand || showAll) ? (
               <div style={{ flex: 1 }}>
-                <button onClick={() => setBrand('')} style={{
+                <button onClick={() => { setBrand(''); setShowAll(false) }} style={{
                   height: 26, padding: '0 12px', borderRadius: 100, cursor: 'pointer', fontFamily: 'inherit',
                   fontSize: 11, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 5,
                   background: 'transparent', border: '0.5px solid rgba(0,0,0,0.12)', color: '#1d1d1f',
@@ -470,6 +471,18 @@ export default function MarketTab({ listings: initialListings, onContact, onSell
           {showBrandGrid ? (
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 22px 14px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                <div onClick={() => setShowAll(true)} style={{
+                  cursor: 'pointer', borderRadius: 14, overflow: 'hidden',
+                  border: '0.5px solid rgba(10,132,255,0.25)', background: 'rgba(10,132,255,0.06)',
+                  transition: 'transform 0.15s, box-shadow 0.15s',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  padding: '36px 12px',
+                }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.1)' }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none' }}>
+                  <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.01em', color: '#0a84ff' }}>See all listings</div>
+                  <div style={{ fontSize: 11, color: '#0a84ff', opacity: 0.7, marginTop: 4 }}>({preFiltered.length})</div>
+                </div>
                 {brandCards.map(({ brand: b, count }) => (
                   <div key={b} onClick={() => setBrand(b)} style={{
                     cursor: 'pointer', borderRadius: 14, overflow: 'hidden',

@@ -267,7 +267,7 @@ export default function AppShell({ initialListings }: { initialListings: Listing
   }, [])
 
   const visibleGlobeDots = [
-    ...resolveListingDots(listings).filter(d => visibleCats[d.category === 'helicopter' ? 'helicopter' : 'airplane']),
+    ...resolveListingDots(listings).filter(d => visibleCats[(d.category === 'helicopter' || d.category === 'gyrocopter') ? 'helicopter' : 'airplane']),
     ...(JOBS_ENABLED && visibleCats.jobs ? resolveJobDots(jobs) : []),
   ]
 
